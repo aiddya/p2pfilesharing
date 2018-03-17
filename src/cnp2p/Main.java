@@ -22,7 +22,7 @@ public class Main {
             ByteArrayInputStream inBytes = new ByteArrayInputStream(inBuf);
             ObjectInputStream inStream = new ObjectInputStream(inBytes);
             inStream.readFully(outBuf);
-            HandshakeMessage rcvMsg = new HandshakeMessage(outBuf);
+            HandshakeMessage rcvMsg = HandshakeMessage.parse(outBuf);
             if (rcvMsg.validate()) {
                 rcvMsg.toString();
             }

@@ -4,17 +4,28 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 public class HandshakeMessage implements Serializable {
-    byte[] bytes;
-    final byte[] bytePrefix = {0x50, 0x32, 0x50, 0x46, 0x49, 0x4c, 0x45, 0x53, 0x48, 0x41, 0x52, 0x49, 0x4e, 0x47, 0x50,
+    private byte[] bytes;
+    private final byte[] bytePrefix = {0x50, 0x32, 0x50, 0x46, 0x49, 0x4c, 0x45, 0x53, 0x48, 0x41, 0x52, 0x49, 0x4e, 0x47, 0x50,
             0x52, 0x4f, 0x4a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     public HandshakeMessage() {
         bytes = new byte[32];
     }
 
-    public HandshakeMessage(byte[] fromBytes) {
-        if (fromBytes.length == 32) {
+    private HandshakeMessage(byte[] fromBytes) {
             bytes = fromBytes;
+    }
+
+    static HandshakeMessage parse(byte[] fromBytes) {
+        if (fromBytes.length != 32) {
+            return null;
+        }
+
+        HandshakeMessage obj = new HandshakeMessage(fromBytes);
+        if(obj.validate()) {
+            return obj;
+        } else {
+            return null;
         }
     }
 
@@ -49,6 +60,7 @@ public class HandshakeMessage implements Serializable {
         return new String(Arrays.copyOfRange(bytes, 28, 32));
     }
 
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("Prefix: ");
