@@ -40,12 +40,8 @@ public class Message {
         if (type == MessageType.HAVE
                 || type == MessageType.REQUEST
                 || type == MessageType.PIECE) {
-            if (index >= 0 && index <= 9999) {
                 messageType = type;
-                this.payload = String.format("%04d", index).getBytes();
-            } else {
-                throw new IllegalArgumentException("Message type requires index to be between 0 and 9999");
-            }
+                this.payload = ByteBuffer.allocate(4).putInt(index).array();
         } else {
             throw new IllegalArgumentException("Message type cannot accept integer payload");
         }
@@ -84,9 +80,27 @@ public class Message {
     byte[] getBytes() {
         int payloadLen = payload == null ? 1 : payload.length + 1;
         byte[] output = new byte[payloadLen + 4];
-        System.arraycopy(String.format("%04d", payloadLen).getBytes(), 0, output, 0, 4);
+        System.arraycopy(ByteBuffer.allocate(4).putInt(payloadLen).array(), 0, output, 0, 4);
         output[4] = messageType.getByte();
-        System.arraycopy(payload, 0, output, 5, payloadLen - 1);
+        System.arraycopy(payload, 0, output, 5, payload.length);
         return output;
+    }
+
+    byte[] getPayload() {
+        return payload;
+    }
+
+    MessageType getType() {
+        return messageType;
+    }
+
+    int getIndex() {
+        if (messageType == MessageType.HAVE
+                || messageType == MessageType.REQUEST
+                || messageType == MessageType.PIECE) {
+            return ByteBuffer.wrap(payload).getInt();
+        } else {
+            return -1;
+        }
     }
 }
