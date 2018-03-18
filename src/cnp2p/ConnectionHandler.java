@@ -9,17 +9,19 @@ public class ConnectionHandler extends Thread {
     private Socket connection;
     private ObjectInputStream inputStream;
     private ObjectOutputStream outputStream;
+    private int localPeerId;
     private int remotePeerId;
     Boolean incomingConnection;
 
-    ConnectionHandler(Socket connection) {
+    ConnectionHandler(Socket connection, int localPeerId) {
         this.connection = connection;
-        this.remotePeerId = remotePeerId;
+        this.localPeerId = localPeerId;
         incomingConnection = true;
     }
 
-    ConnectionHandler(Socket connection, int remotePeerId) {
+    ConnectionHandler(Socket connection, int localPeerId, int remotePeerId) {
         this.connection = connection;
+        this.localPeerId = localPeerId;
         this.remotePeerId = remotePeerId;
         incomingConnection = false;
     }
@@ -31,10 +33,14 @@ public class ConnectionHandler extends Thread {
             outputStream.flush();
             inputStream = new ObjectInputStream(connection.getInputStream());
 
-            inputStream.read(buf);
-            HandshakeMessage msg = HandshakeMessage.parse(buf);
-            if (msg != null) {
-                HandshakeMessage reply = new HandshakeMessage(remotePeerId);
+            if (incomingConnection) {
+                inputStream.read(buf);
+                HandshakeMessage msg = HandshakeMessage.parse(buf);
+                if (msg != null) {
+                    HandshakeMessage reply = new HandshakeMessage(remotePeerId);
+                }
+            } else {
+                HandshakeMessage hs = new HandshakeMessage(Config.)
             }
         } catch (Exception e) {
 
