@@ -1,48 +1,36 @@
 package cnp2p;
 
 
+import java.io.IOException;
+import java.net.Socket;
 import java.util.*;
 
 public class peerProcess {
-	private List<Peer> peerList;
 	private Scanner peerInfoScanner;
+	ConnectionHandler connection;
+	Peer peer;
 	public peerProcess(int peerID) {
-		Config config = new Config();
-		getPeerInfo();
-		connectToPeers(peerID);
+		Config config = Config.getInstance();
+		for(Peer p : config.peerList) {
+			if(p.getPeerID() == peerID) {
+				peer = p;
+			}
+		}
+		try {
+			peer.setRequestSocket(new Socket(peer.getHostName(),peer.getPortNumber()));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		peer.connectToPeers(peerID);
+		connection = new ConnectionHandler(peer.requestSocket, peerID);
 	}
 	
-	private void connectToPeers(int peerID) {
-		for(Peer p : peerList) {
-			if(p.getPeerID() != peerID) {
-				p.connect();
-			}
-			else break;
-		}
-	}
-	private void getPeerInfo() {
-	    Scanner in;
-        peerInfoScanner = new Scanner("PeerInfo.cfg");
-        while(peerInfoScanner.hasNextLine()) {
-        		in = new Scanner(peerInfoScanner.nextLine());
-        		in.useDelimiter(" ");
-        		Peer p = new Peer();
-        		p.setPeerID(Integer.parseInt(in.next()));
-        		p.setHostName(in.next());
-        		p.setPortNumber(Integer.parseInt(in.next()));
-        		p.setHasFile(Boolean.parseBoolean(in.next()));
-        		peerList.add(p);
-        }
-	}
 	public static void main(String[] args) {
     		
        //peerProcess p = new peerProcess();
     }
 
-	public List<Peer> getPeerList() {
-		return peerList;
-	}
-	
 
 }
 
