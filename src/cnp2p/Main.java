@@ -14,8 +14,7 @@ public class Main {
         try {
             ByteArrayOutputStream outBytes = new ByteArrayOutputStream(256);
             ObjectOutputStream outStream = new ObjectOutputStream(outBytes);
-            HandshakeMessage msg = new HandshakeMessage();
-            msg.create("1001");
+            HandshakeMessage msg = new HandshakeMessage(1001);
             outStream.write(msg.getBytes());
             outStream.flush();
             inBuf = outBytes.toByteArray();

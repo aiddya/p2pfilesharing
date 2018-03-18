@@ -1,20 +1,31 @@
 package cnp2p;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.*;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 
-public class Logger {
+class Logger {
 
     private int peerID;
     private Path logFilePath;
     private Calendar calendar;
     private SimpleDateFormat simpleDateFormat;
-    private PrintWriter printWriter;
+    private FileChannel fileChannel;
+    private static Logger loggerInstance;
 
-    Logger(int peerID, String directoryPath){
+    static void createInstance(int peerID, String directoryPath){
+        loggerInstance = new Logger(peerID, directoryPath);
+    }
+
+    static Logger getInstance(){
+            return loggerInstance;
+    }
+
+    private Logger(int peerID, String directoryPath){
         String logFileName;
         this.peerID = peerID;
         logFileName = "log_peer_" + this.peerID + ".log";
@@ -23,16 +34,28 @@ public class Logger {
         simpleDateFormat = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss");
         try {
             OpenOption[] options = new OpenOption[]{StandardOpenOption.APPEND, StandardOpenOption.SYNC};
-            BufferedWriter bufferedWriter = Files.newBufferedWriter(logFilePath,
-                    StandardCharsets.UTF_8, options);
-            printWriter = new PrintWriter(bufferedWriter);
+            fileChannel = FileChannel.open(logFilePath, options);
         }catch(IOException ex){
             ex.printStackTrace();
         }
     }
 
     private void writeToFile(String message){
-            printWriter.println(message);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(message.getBytes().length
+                + System.getProperty("line.separator").getBytes().length);
+        byte[] messageBytes = message.getBytes();
+        byteBuffer.put(messageBytes);
+        byteBuffer.put(System.getProperty("line.separator").getBytes());
+        byteBuffer.flip();
+        try {
+            FileLock fileLock = fileChannel.lock();
+            while(byteBuffer.hasRemaining()) {
+                fileChannel.write(byteBuffer);
+            }
+            fileLock.release();
+        }catch(IOException ex){
+            ex.printStackTrace();
+        }
     }
 
     void tcpConnectionEstablishedTo(int peerID){
