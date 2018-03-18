@@ -1,17 +1,16 @@
 package cnp2p;
 
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 
 public class ConnectionHandler extends Thread {
-    final int BUFFER_SIZE = 32;
+    private final int BUFFER_SIZE = 32;
     private Socket connection;
-    private ObjectInputStream inputStream;
-    private ObjectOutputStream outputStream;
     private int localPeerId;
     private int remotePeerId;
-    Boolean incomingConnection;
+    private boolean incomingConnection;
 
     ConnectionHandler(Socket connection, int localPeerId) {
         this.connection = connection;
@@ -29,20 +28,32 @@ public class ConnectionHandler extends Thread {
     public void run() {
         byte[] buf = new byte[BUFFER_SIZE];
         try {
-            outputStream = new ObjectOutputStream(connection.getOutputStream());
+            ObjectOutputStream outputStream = new ObjectOutputStream(connection.getOutputStream());
+            ObjectInputStream inputStream = new ObjectInputStream(connection.getInputStream());
             outputStream.flush();
-            inputStream = new ObjectInputStream(connection.getInputStream());
 
             if (incomingConnection) {
                 inputStream.read(buf);
-                HandshakeMessage msg = HandshakeMessage.parse(buf);
-                if (msg != null) {
-                    HandshakeMessage reply = new HandshakeMessage(remotePeerId);
+                HandshakeMessage ihs = HandshakeMessage.parse(buf);
+                if (ihs != null) {
+                    HandshakeMessage ohs = new HandshakeMessage(remotePeerId);
+                    outputStream.write(ohs.getBytes());
+                    outputStream.flush();
                 }
             } else {
-                HandshakeMessage hs = new HandshakeMessage(Config.)
+                HandshakeMessage ohs = new HandshakeMessage(localPeerId);
+                outputStream.write(ohs.getBytes());
+                outputStream.flush();
+                inputStream.read(buf);
+                HandshakeMessage ihs = HandshakeMessage.parse(buf);
+                if (ihs == null || ihs.getPeerId() != remotePeerId) {
+                    return;
+                }
             }
-        } catch (Exception e) {
+
+
+        } catch (IOException e) {
+
 
         }
     }

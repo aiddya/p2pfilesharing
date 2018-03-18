@@ -10,13 +10,13 @@ import java.util.Properties;
 import java.util.Scanner;
 
 public class Config {
-	private static int preferredNeighbors;
-	private static int unchokingInterval;
-	private static int optimisticUnchokingInterval;
-	private static String fileName;
-	private static long fileSize;
-	private static long pieceSize;
-	private static Config instance=null;
+	private int preferredNeighbors;
+	private int unchokingInterval;
+	private int optimisticUnchokingInterval;
+	private String fileName;
+	private int fileSize;
+	private int pieceSize;
+	private volatile static Config instance;
 	List<Peer> peerList;
 	private Scanner peerInfoScanner;
 
@@ -33,8 +33,8 @@ public class Config {
             unchokingInterval = Integer.parseInt(commonProp.getProperty("UnchokingInterval"));
             optimisticUnchokingInterval = Integer.parseInt(commonProp.getProperty("OptimisticUnchokingInterval"));
             fileName = commonProp.getProperty("FileName");
-            fileSize = Long.parseLong(commonProp.getProperty("FileSize"));
-            pieceSize = Long.parseLong(commonProp.getProperty("PieceSize"));
+            fileSize = Integer.parseInt(commonProp.getProperty("FileSize"));
+            pieceSize = Integer.parseInt(commonProp.getProperty("PieceSize"));
         } 
         catch (IOException e) {
             e.printStackTrace();
@@ -44,8 +44,14 @@ public class Config {
 	}
 	
 	public static Config getInstance() {
-		if(instance != null) return instance;
-		else return new Config();
+		if(instance == null) {
+		    synchronized (Config.class) {
+		        if (instance == null) {
+		            instance = new Config();
+                }
+            }
+        }
+        return instance;
 	}
 
 	private void getPeerInfo() {
@@ -62,5 +68,28 @@ public class Config {
         		peerList.add(p);
         }
 	}
-	
+
+    public int getPreferredNeighbors() {
+        return preferredNeighbors;
+    }
+
+    public int getUnchokingInterval() {
+        return unchokingInterval;
+    }
+
+    public int getOptimisticUnchokingInterval() {
+        return optimisticUnchokingInterval;
+    }
+
+    public String getFileName() {
+        return fileName;
+    }
+
+    public int getFileSize() {
+        return fileSize;
+    }
+
+    public int getPieceSize() {
+        return pieceSize;
+    }
 }

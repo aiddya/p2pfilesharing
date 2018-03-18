@@ -32,7 +32,7 @@ public class HandshakeMessage implements Serializable {
         }
     }
 
-    Boolean validate() {
+    boolean validate() {
         if (bytes == null) {
             return false;
         }
