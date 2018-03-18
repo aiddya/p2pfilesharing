@@ -1,15 +1,18 @@
 package cnp2p;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 public class HandshakeMessage implements Serializable {
     private byte[] bytes;
-    private final byte[] bytePrefix = {0x50, 0x32, 0x50, 0x46, 0x49, 0x4c, 0x45, 0x53, 0x48, 0x41, 0x52, 0x49, 0x4e, 0x47, 0x50,
-            0x52, 0x4f, 0x4a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    private final byte[] bytePrefix = {0x50, 0x32, 0x50, 0x46, 0x49, 0x4c, 0x45, 0x53, 0x48, 0x41, 0x52, 0x49, 0x4e,
+            0x47, 0x50, 0x52, 0x4f, 0x4a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
-    public HandshakeMessage() {
+    public HandshakeMessage(int peerId) {
         bytes = new byte[32];
+        System.arraycopy(bytePrefix, 0, bytes, 0, 28);
+        System.arraycopy(ByteBuffer.allocate(4).putInt(peerId).array(), 0, bytes, 28, 4);
     }
 
     private HandshakeMessage(byte[] fromBytes) {
@@ -26,16 +29,6 @@ public class HandshakeMessage implements Serializable {
             return obj;
         } else {
             return null;
-        }
-    }
-
-    Boolean create(String peerId) {
-        if (peerId.length() == 4) {
-            System.arraycopy(bytePrefix, 0, bytes, 0, 28);
-            System.arraycopy(peerId.getBytes(), 0, bytes, 28, 4);
-            return true;
-        } else {
-            return false;
         }
     }
 
@@ -56,8 +49,8 @@ public class HandshakeMessage implements Serializable {
         return bytes;
     }
 
-    String getPeerId() {
-        return new String(Arrays.copyOfRange(bytes, 28, 32));
+    int getPeerId() {
+        return ByteBuffer.wrap(Arrays.copyOfRange(bytes, 28, 32)).getInt();
     }
 
     @Override
