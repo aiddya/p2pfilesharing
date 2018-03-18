@@ -11,6 +11,7 @@ public class Peer {
 	private int portNumber;
 	private boolean hasFile;
 	Socket requestSocket;
+	ConnectionHandler connection;
 	
 	public int getPeerID() {
 		return peerID;
@@ -37,9 +38,10 @@ public class Peer {
 		this.hasFile = hasFile;
 	}
 	
-	public void connect() {
+	public void connect(int incomingPeerID) {
 		try{
 			requestSocket = new Socket(hostName, portNumber);
+			connection = new ConnectionHandler(requestSocket, incomingPeerID, peerID );
 		}
 		catch (ConnectException e) {
     			System.err.println("Connection refused. You need to initiate a server first.");
@@ -52,6 +54,23 @@ public class Peer {
 		}
 	}
 	
+
+	public void connectToPeers(int peerID) {
+		Config config = Config.getInstance();
+		for(Peer p : config.peerList) {
+			if(p.getPeerID() != peerID) {
+				p.connect(peerID);
+			}
+			else break;
+		}
+	}
+	
+	public Socket getRequestSocket() {
+		return requestSocket;
+	}
+	public void setRequestSocket(Socket requestSocket) {
+		this.requestSocket = requestSocket;
+	}
 	public void closeConnection() {
 		try{
 			requestSocket.close();
