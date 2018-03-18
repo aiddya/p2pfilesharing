@@ -33,7 +33,8 @@ class Logger {
         calendar = Calendar.getInstance();
         simpleDateFormat = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss");
         try {
-            OpenOption[] options = new OpenOption[]{StandardOpenOption.APPEND, StandardOpenOption.SYNC};
+            OpenOption[] options = new OpenOption[]{StandardOpenOption.WRITE, StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND, StandardOpenOption.SYNC};
             fileChannel = FileChannel.open(logFilePath, options);
         }catch(IOException ex){
             ex.printStackTrace();
