@@ -1,6 +1,5 @@
 package cnp2p;
 
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
@@ -36,23 +35,46 @@ public class ConnectionHandler extends Thread {
                 inputStream.read(buf);
                 HandshakeMessage ihs = HandshakeMessage.parse(buf);
                 if (ihs != null) {
-                    HandshakeMessage ohs = new HandshakeMessage(remotePeerId);
+                    remotePeerId = ihs.getPeerId();
+                    HandshakeMessage ohs = new HandshakeMessage(localPeerId);
                     outputStream.write(ohs.getBytes());
                     outputStream.flush();
+                } else {
+                    return;
                 }
+
+                Logger.getInstance().tcpConnectionEstablishedFrom(remotePeerId);
+                Message incomingBitField;
+                try {
+                    incomingBitField = (Message) inputStream.readObject();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return;
+                }
+                Tracker.getInstance().setPeerBitField(remotePeerId, incomingBitField.getPayload());
+                Message outgoingBitField = new Message(MessageType.BITFIELD, Tracker.getInstance().getBitField());
+                outputStream.writeObject(outgoingBitField);
+                outputStream.flush();
             } else {
                 HandshakeMessage ohs = new HandshakeMessage(localPeerId);
                 outputStream.write(ohs.getBytes());
                 outputStream.flush();
-                inputStream.read(buf);
+                inputStream.readFully(buf);
                 HandshakeMessage ihs = HandshakeMessage.parse(buf);
                 if (ihs == null || ihs.getPeerId() != remotePeerId) {
                     return;
                 }
+
+                Logger.getInstance().tcpConnectionEstablishedTo(remotePeerId);
+                Message outgoingBitField = new Message(MessageType.BITFIELD, Tracker.getInstance().getBitField());
+                outputStream.writeObject(outgoingBitField);
+                outputStream.flush();
+                Message incomingBitField = (Message) inputStream.readObject();
+                Tracker.getInstance().setPeerBitField(remotePeerId, incomingBitField.getPayload());
             }
+            Thread.sleep(600000);
 
-
-        } catch (IOException e) {
+        } catch (Exception e) {
 
 
         }

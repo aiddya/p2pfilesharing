@@ -17,8 +17,11 @@ public enum MessageType {
     }
 
     public static MessageType fromByte(byte val) {
-        int intVal = (int) val;
-        switch(intVal) {
+        return fromInt((int) val);
+    }
+
+    public static MessageType fromInt(int val) {
+        switch (val) {
             case 0:
                 return CHOKE;
             case 1:

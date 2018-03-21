@@ -5,9 +5,9 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 public class HandshakeMessage implements Serializable {
-    private byte[] bytes;
     private final byte[] bytePrefix = {0x50, 0x32, 0x50, 0x46, 0x49, 0x4c, 0x45, 0x53, 0x48, 0x41, 0x52, 0x49, 0x4e,
             0x47, 0x50, 0x52, 0x4f, 0x4a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    private byte[] bytes;
 
     public HandshakeMessage(int peerId) {
         bytes = new byte[32];
@@ -16,7 +16,7 @@ public class HandshakeMessage implements Serializable {
     }
 
     private HandshakeMessage(byte[] fromBytes) {
-            bytes = fromBytes;
+        bytes = fromBytes;
     }
 
     static HandshakeMessage parse(byte[] fromBytes) {
@@ -25,7 +25,7 @@ public class HandshakeMessage implements Serializable {
         }
 
         HandshakeMessage obj = new HandshakeMessage(fromBytes);
-        if(obj.validate()) {
+        if (obj.validate()) {
             return obj;
         } else {
             return null;

@@ -1,11 +1,19 @@
 package cnp2p;
 
+import java.util.BitSet;
+import java.util.HashMap;
+import java.util.Random;
+
 public class Tracker {
     private volatile static Tracker instance;
-    byte[] bitField;
+    private int numPieces;
+    private BitSet bitField;
+    HashMap<Integer, BitSet> peerBitField;
 
     private Tracker() {
-        bitField = new byte[(Config.getInstance().getFileSize() - 1) / Config.getInstance().getPieceSize() + 1];
+        numPieces = (Config.getInstance().getFileSize() - 1) / Config.getInstance().getPieceSize() + 1;
+        bitField = new BitSet(numPieces);
+        peerBitField = new HashMap<>();
     }
 
     public static Tracker getInstance() {
@@ -19,21 +27,42 @@ public class Tracker {
         return instance;
     }
 
+    boolean isFileEmpty() {
+        return bitField.cardinality() == 0;
+    }
+
     byte[] getBitField() {
-        return bitField;
+        byte[] output = new byte[(numPieces - 1) / 8 + 1];
+        byte[] temp = bitField.toByteArray();
+        System.arraycopy(temp, 0, output, 0, temp.length);
+        return output;
     }
 
     void setBit(int pieceIndex) {
-        int byteIndex = pieceIndex / 8;
-        int byteOffset = pieceIndex % 8;
-        bitField[byteIndex] |= (1 << byteOffset);
+        bitField.set(pieceIndex);
     }
 
-    void setAllBits(){
-        for(int i = 0; i < bitField.length; i++)
-        {
-            bitField[i] = (byte)(-128);
+    void setAllBits() {
+        bitField.set(0, numPieces, true);
+    }
+
+    void setPeerBitField(int peerId, byte[] peerField) {
+        peerBitField.put(peerId, BitSet.valueOf(peerField));
+    }
+
+    int getNewRandomPieceNumber(int peerId) {
+        if (!peerBitField.containsKey(peerId)) {
+            return -1;
         }
-    }
 
+        BitSet diff = peerBitField.get(peerId);
+        diff.andNot(bitField);
+        int diffCard = diff.cardinality();
+        if (diffCard == 0) {
+            return -1;
+        }
+
+        int nextRand = new Random().nextInt(diffCard);
+        return diff.stream().skip(nextRand).iterator().nextInt();
+    }
 }

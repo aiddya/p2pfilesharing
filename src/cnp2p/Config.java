@@ -5,15 +5,14 @@ import java.net.URL;
 import java.util.*;
 
 public class Config {
+    private volatile static Config instance;
     private int preferredNeighbors;
     private int unchokingInterval;
     private int optimisticUnchokingInterval;
     private String fileName;
     private int fileSize;
     private int pieceSize;
-    private volatile static Config instance;
-    List<Peer> peerList;
-    private Scanner peerInfoScanner;
+    private List<Peer> peerList;
     private String currentDirectory;
 
     private Config() {
@@ -38,10 +37,6 @@ public class Config {
         readPeerInfo();
     }
 
-    public String getCurrentDirectory() {
-        return currentDirectory;
-    }
-
     public static Config getInstance() {
         if (instance == null) {
             synchronized (Config.class) {
@@ -53,19 +48,20 @@ public class Config {
         return instance;
     }
 
+    public String getCurrentDirectory() {
+        return currentDirectory;
+    }
+
     private void readPeerInfo() {
         File peerInfoConfig = new File("PeerInfo.cfg");
+        peerList = new ArrayList<>();
         try {
             BufferedReader reader = new BufferedReader(new FileReader(peerInfoConfig));
             String line = reader.readLine();
             while (line != null) {
                 StringTokenizer st = new StringTokenizer(line, " ");
-                Peer p = new Peer();
-                p.setPeerID(Integer.parseInt(st.nextToken()));
-                p.setHostName(st.nextToken());
-                p.setPortNumber(Integer.parseInt(st.nextToken()));
-                p.setHasFile(Boolean.parseBoolean(st.nextToken()));
-                peerList.add(p);
+                peerList.add(new Peer(Integer.parseInt(st.nextToken()), st.nextToken(),
+                        Integer.parseInt(st.nextToken()), Integer.parseInt(st.nextToken()) == 1));
                 line = reader.readLine();
             }
             reader.close();
@@ -96,5 +92,9 @@ public class Config {
 
     public int getPieceSize() {
         return pieceSize;
+    }
+
+    public List<Peer> getPeerList() {
+        return peerList;
     }
 }

@@ -1,14 +1,13 @@
 package cnp2p;
 
-
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class peerProcess {
-
-    private static List<Peer> peerListTrim;
     private static List<ConnectionHandler> connectionHandlerList;
 
     public static void main(String[] args) {
@@ -25,61 +24,71 @@ public class peerProcess {
 
         try {
             peerId = Integer.parseInt(args[0]);
+        } catch (Exception e) {
+            System.out.println("Peer ID is not a number. Exiting!");
+            return;
+        }
+
+        try {
             Logger.createInstance(peerId, Config.getInstance().getCurrentDirectory());
-            logger = Logger.getInstance();
+        } catch (Exception e) {
+            System.out.println("Unable to read configuration. Exiting!");
+            return;
+        }
 
-            peerListComplete = Config.getInstance().peerList;
+        logger = Logger.getInstance();
 
-            for(indexPeers = 0; indexPeers < peerListComplete.size() &&
-                    peerListComplete.get(indexPeers).getPeerID() != peerId; indexPeers++)
-            {
-                peerListTrim.add(peerListComplete.get(indexPeers));
-            }
+        peerListComplete = Config.getInstance().getPeerList();
 
-            tracker = Tracker.getInstance();
-            listeningPortNumber = peerListComplete.get(indexPeers).getPortNumber();
-            if(peerListComplete.get(indexPeers).isHasFile())
-                tracker.setAllBits();
+        if (peerListComplete.isEmpty()) {
+            System.out.println("No peers listed in peer configuration. Exiting!");
+            return;
+        }
 
-            Thread listeningThread = new Thread(() -> {
-                try {
-                    ServerSocket serverSocket = new ServerSocket(listeningPortNumber);
-                    while(true) {
-                        Socket clientSocket = serverSocket.accept();
-                        ConnectionHandler connectionHandler = new ConnectionHandler(clientSocket, peerId);
-                        connectionHandlerList.add(connectionHandler);
-                        connectionHandler.run();
-                    }
-                }catch(IOException io)
-                {
-                    io.printStackTrace();
+        List<Peer> peerListTrim = new ArrayList<>();
+        connectionHandlerList = new CopyOnWriteArrayList<>();
+
+        for (indexPeers = 0; indexPeers < peerListComplete.size() &&
+                peerListComplete.get(indexPeers).getPeerId() != peerId; indexPeers++) {
+            peerListTrim.add(peerListComplete.get(indexPeers));
+        }
+        
+        listeningPortNumber = peerListComplete.get(indexPeers).getPortNumber();
+        if (peerListComplete.get(indexPeers).hasFile()) {
+            Tracker.getInstance().setAllBits();
+        }
+
+        Thread listeningThread = new Thread(() -> {
+            try {
+                ServerSocket serverSocket = new ServerSocket(listeningPortNumber);
+                while (true) {
+                    Socket clientSocket = serverSocket.accept();
+                    ConnectionHandler connectionHandler = new ConnectionHandler(clientSocket, peerId);
+                    connectionHandlerList.add(connectionHandler);
+                    connectionHandler.start();
                 }
-            });
-            listeningThread.run();
+            } catch (IOException io) {
+                io.printStackTrace();
+            }
+        });
 
-            for(Peer peer : peerListTrim)
-            {
+        listeningThread.start();
+
+        for (Peer peer : peerListTrim) {
+            try {
                 Socket connectPeerSocket = new Socket(peer.getHostName(),
                         peer.getPortNumber());
                 ConnectionHandler connectionHandler =
-                        new ConnectionHandler(connectPeerSocket, peerId, peer.getPeerID());
+                        new ConnectionHandler(connectPeerSocket, peerId, peer.getPeerId());
                 connectionHandlerList.add(connectionHandler);
-                connectionHandler.run();
+                connectionHandler.start();
+            } catch (Exception e) {
+                System.out.println("Failed to initiate connection with " + peer.getHostName());
             }
-
-        } catch (Exception e) {
-            System.out.println("Peer ID must be a number. Exiting!");
         }
 
-        //System.out.println("Preferred neighbour: " + Config.getInstance().getPreferredNeighbors());
-        //System.out.println("Unchoking interval: " + Config.getInstance().getUnchokingInterval());
-        //System.out.println("Optimistic unchoking interval: " + Config.getInstance().getOptimisticUnchokingInterval());
-        //System.out.println("File name: " + Config.getInstance().getFileName());
-        //System.out.println("File size: " + Config.getInstance().getFileSize());
-        //System.out.println("Piece size: " + Config.getInstance().getPieceSize());
+
     }
-
-
 }
 
 
