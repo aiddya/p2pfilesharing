@@ -1,32 +1,27 @@
 package cnp2p;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
-import java.util.List;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.Scanner;
+import java.util.*;
 
 public class Config {
-	private int preferredNeighbors;
-	private int unchokingInterval;
-	private int optimisticUnchokingInterval;
-	private String fileName;
-	private int fileSize;
-	private int pieceSize;
-	private volatile static Config instance;
-	List<Peer> peerList;
-	private Scanner peerInfoScanner;
+    private int preferredNeighbors;
+    private int unchokingInterval;
+    private int optimisticUnchokingInterval;
+    private String fileName;
+    private int fileSize;
+    private int pieceSize;
+    private volatile static Config instance;
+    List<Peer> peerList;
+    private Scanner peerInfoScanner;
 
-	private Config() {
-    		Properties commonProp = new Properties();
+    private Config() {
+        Properties commonProp = new Properties();
         try {
             String commonConfig = "Config.cfg";
             ClassLoader classLoader = peerProcess.class.getClassLoader();
             URL res = Objects.requireNonNull(classLoader.getResource(commonConfig),
-                "Can't find configuration file Config.cfg");
+                    "Can't find configuration file Config.cfg");
             InputStream is = new FileInputStream(res.getFile());
             commonProp.load(is);
             preferredNeighbors = Integer.parseInt(commonProp.getProperty("NumberOfPreferredNeighbors"));
@@ -35,39 +30,43 @@ public class Config {
             fileName = commonProp.getProperty("FileName");
             fileSize = Integer.parseInt(commonProp.getProperty("FileSize"));
             pieceSize = Integer.parseInt(commonProp.getProperty("PieceSize"));
-        } 
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
-        getPeerInfo();
-        instance = this;
-	}
-	
-	public static Config getInstance() {
-		if(instance == null) {
-		    synchronized (Config.class) {
-		        if (instance == null) {
-		            instance = new Config();
+        readPeerInfo();
+    }
+
+    public static Config getInstance() {
+        if (instance == null) {
+            synchronized (Config.class) {
+                if (instance == null) {
+                    instance = new Config();
                 }
             }
         }
         return instance;
-	}
+    }
 
-	private void getPeerInfo() {
-	    Scanner in;
-        peerInfoScanner = new Scanner("PeerInfo.cfg");
-        while(peerInfoScanner.hasNextLine()) {
-        		in = new Scanner(peerInfoScanner.nextLine());
-        		in.useDelimiter(" ");
-        		Peer p = new Peer();
-        		p.setPeerID(Integer.parseInt(in.next()));
-        		p.setHostName(in.next());
-        		p.setPortNumber(Integer.parseInt(in.next()));
-        		p.setHasFile(Boolean.parseBoolean(in.next()));
-        		peerList.add(p);
+    private void readPeerInfo() {
+        File peerInfoConfig = new File("PeerInfo.cfg");
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(peerInfoConfig));
+            String line = reader.readLine();
+            while (line != null) {
+                StringTokenizer st = new StringTokenizer(line, " ");
+                Peer p = new Peer();
+                p.setPeerID(Integer.parseInt(st.nextToken()));
+                p.setHostName(st.nextToken());
+                p.setPortNumber(Integer.parseInt(st.nextToken()));
+                p.setHasFile(Boolean.parseBoolean(st.nextToken()));
+                peerList.add(p);
+                line = reader.readLine();
+            }
+            reader.close();
+        } catch (Exception e) {
+            return;
         }
-	}
+    }
 
     public int getPreferredNeighbors() {
         return preferredNeighbors;
