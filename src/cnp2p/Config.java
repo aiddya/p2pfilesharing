@@ -14,6 +14,7 @@ public class Config {
     private volatile static Config instance;
     List<Peer> peerList;
     private Scanner peerInfoScanner;
+    private String currentDirectory;
 
     private Config() {
         Properties commonProp = new Properties();
@@ -23,6 +24,7 @@ public class Config {
             URL res = Objects.requireNonNull(classLoader.getResource(commonConfig),
                     "Can't find configuration file Config.cfg");
             InputStream is = new FileInputStream(res.getFile());
+            currentDirectory = System.getProperty("user.dir");
             commonProp.load(is);
             preferredNeighbors = Integer.parseInt(commonProp.getProperty("NumberOfPreferredNeighbors"));
             unchokingInterval = Integer.parseInt(commonProp.getProperty("UnchokingInterval"));
@@ -34,6 +36,10 @@ public class Config {
             e.printStackTrace();
         }
         readPeerInfo();
+    }
+
+    public String getCurrentDirectory() {
+        return currentDirectory;
     }
 
     public static Config getInstance() {

@@ -28,4 +28,12 @@ public class Tracker {
         int byteOffset = pieceIndex % 8;
         bitField[byteIndex] |= (1 << byteOffset);
     }
+
+    void setAllBits(){
+        for(int i = 0; i < bitField.length; i++)
+        {
+            bitField[i] = (byte)(-128);
+        }
+    }
+
 }
