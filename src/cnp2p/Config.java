@@ -14,6 +14,7 @@ public class Config {
     private int pieceSize;
     private List<Peer> peerList;
     private String currentDirectory;
+    private boolean hasFile;
 
     private Config() {
         Properties commonProp = new Properties();
@@ -46,6 +47,14 @@ public class Config {
             }
         }
         return instance;
+    }
+
+    public boolean getHasFile(){
+        return hasFile;
+    }
+
+    public void setHasFile(boolean hasFile) {
+        this.hasFile = hasFile;
     }
 
     public String getCurrentDirectory() {

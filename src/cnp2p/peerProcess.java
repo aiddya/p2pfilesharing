@@ -52,9 +52,10 @@ public class peerProcess {
                 peerListComplete.get(indexPeers).getPeerId() != peerId; indexPeers++) {
             peerListTrim.add(peerListComplete.get(indexPeers));
         }
-        
+
         listeningPortNumber = peerListComplete.get(indexPeers).getPortNumber();
         if (peerListComplete.get(indexPeers).hasFile()) {
+            Config.getInstance().setHasFile(true);
             Tracker.getInstance().setAllBits();
         }
 

@@ -113,10 +113,12 @@ public class Message implements Externalizable {
             throw new ClassNotFoundException("Invalid message length, too short");
         }
 
-        payload = new byte[length - 1];
-        for (int i = 0; i <= payload.length / BUFFER_SIZE; i++) {
-            int remaining = payload.length - (i * BUFFER_SIZE);
-            in.read(payload, i * BUFFER_SIZE, remaining < BUFFER_SIZE ? remaining : BUFFER_SIZE);
+        if (length > 1) {
+            payload = new byte[length - 1];
+            for (int i = 0; i <= payload.length / BUFFER_SIZE; i++) {
+                int remaining = payload.length - (i * BUFFER_SIZE);
+                in.read(payload, i * BUFFER_SIZE, remaining < BUFFER_SIZE ? remaining : BUFFER_SIZE);
+            }
         }
     }
 
