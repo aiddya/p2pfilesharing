@@ -16,6 +16,7 @@ public class Tracker {
     private volatile static Tracker instance;
     private int numPieces;
     private BitSet bitField;
+    private BitSet reqBitField;
     private Hashtable<Integer, BitSet> peerBitField;
     private Path filePath;
     private FileChannel fileChannel;
@@ -23,6 +24,7 @@ public class Tracker {
     private Tracker() {
         numPieces = (Config.getInstance().getFileSize() - 1) / Config.getInstance().getPieceSize() + 1;
         bitField = new BitSet(numPieces);
+        reqBitField = new BitSet(numPieces);
         peerBitField = new Hashtable<>();
         filePath = Paths.get(Config.getInstance().getCurrentDirectory(), Config.getInstance().getFileName());
         try {
@@ -69,6 +71,14 @@ public class Tracker {
         bitField.set(0, numPieces, true);
     }
 
+    void setPieceRequested(int pieceIndex) {
+        reqBitField.set(pieceIndex);
+    }
+
+    void unsetPieceRequested(int pieceIndex) {
+        reqBitField.clear(pieceIndex);
+    }
+
     void setPeerBitField(int peerId, byte[] peerField) {
         peerBitField.put(peerId, BitSet.valueOf(peerField));
     }
@@ -80,6 +90,7 @@ public class Tracker {
 
         BitSet diff = (BitSet) peerBitField.get(peerId).clone();
         diff.andNot(bitField);
+        diff.andNot(reqBitField);
         int diffCard = diff.cardinality();
         if (diffCard == 0) {
             return -1;
