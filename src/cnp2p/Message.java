@@ -86,7 +86,9 @@ public class Message implements Externalizable {
         int payloadLen = payload == null ? 1 : payload.length + 1;
         out.write(ByteBuffer.allocate(4).putInt(payloadLen).array());
         out.write(messageType.getByte());
-        out.write(payload);
+        if (payload != null) {
+            out.write(payload);
+        }
         out.flush();
     }
 

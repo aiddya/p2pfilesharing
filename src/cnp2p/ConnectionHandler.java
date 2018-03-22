@@ -51,6 +51,21 @@ public class ConnectionHandler extends Thread {
                 Message outgoingBitField = new Message(MessageType.BITFIELD, Tracker.getInstance().getBitField());
                 outputStream.writeObject(outgoingBitField);
                 outputStream.flush();
+
+                Message iint = (Message) inputStream.readObject();
+                if (iint.getType() == MessageType.INTERESTED) {
+                    Logger.getInstance().receivedInterestedFrom(remotePeerId);
+                } else if (iint.getType() == MessageType.NOT_INTERESTED) {
+                    Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
+                }
+                Message oint;
+                if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId) != -1) {
+                    oint = new Message(MessageType.INTERESTED);
+                } else {
+                    oint = new Message(MessageType.NOT_INTERESTED);
+                }
+                outputStream.writeObject(oint);
+                outputStream.flush();
             } else {
                 HandshakeMessage ohs = new HandshakeMessage(localPeerId);
                 outputStream.write(ohs.getBytes());
@@ -68,6 +83,21 @@ public class ConnectionHandler extends Thread {
                 outputStream.flush();
                 Message incomingBitField = (Message) inputStream.readObject();
                 Tracker.getInstance().setPeerBitField(remotePeerId, incomingBitField.getPayload());
+
+                Message oint;
+                if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId) != -1) {
+                    oint = new Message(MessageType.INTERESTED);
+                } else {
+                    oint = new Message(MessageType.NOT_INTERESTED);
+                }
+                outputStream.writeObject(oint);
+                outputStream.flush();
+                Message iint = (Message) inputStream.readObject();
+                if (iint.getType() == MessageType.INTERESTED) {
+                    Logger.getInstance().receivedInterestedFrom(remotePeerId);
+                } else if (iint.getType() == MessageType.NOT_INTERESTED) {
+                    Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
+                }
             }
             Thread.sleep(600000);
 
