@@ -40,17 +40,13 @@ public class ConnectionHandler extends Thread {
                     outputStream.write(ohs.getBytes());
                     outputStream.flush();
                 } else {
+                    System.out.println("Malformed handshake message");
                     return;
                 }
 
                 Logger.getInstance().tcpConnectionEstablishedFrom(remotePeerId);
                 Message incomingBitField;
-                try {
-                    incomingBitField = (Message) inputStream.readObject();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    return;
-                }
+                incomingBitField = (Message) inputStream.readObject();
                 Tracker.getInstance().setPeerBitField(remotePeerId, incomingBitField.getPayload());
                 Message outgoingBitField = new Message(MessageType.BITFIELD, Tracker.getInstance().getBitField());
                 outputStream.writeObject(outgoingBitField);
@@ -62,6 +58,7 @@ public class ConnectionHandler extends Thread {
                 inputStream.readFully(buf);
                 HandshakeMessage ihs = HandshakeMessage.parse(buf);
                 if (ihs == null || ihs.getPeerId() != remotePeerId) {
+                    System.out.println("Malformed handshake message");
                     return;
                 }
 
@@ -75,8 +72,8 @@ public class ConnectionHandler extends Thread {
             Thread.sleep(600000);
 
         } catch (Exception e) {
-
-
+            System.out.println("Encountered an error while communicating with a peer");
+            e.printStackTrace();
         }
     }
 }

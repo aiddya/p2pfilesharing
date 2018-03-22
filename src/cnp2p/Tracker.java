@@ -20,7 +20,6 @@ public class Tracker {
     private Path filePath;
     private FileChannel fileChannel;
 
-
     private Tracker() {
         numPieces = (Config.getInstance().getFileSize() - 1) / Config.getInstance().getPieceSize() + 1;
         bitField = new BitSet(numPieces);
@@ -35,7 +34,7 @@ public class Tracker {
                         StandardOpenOption.SYNC};
                 fileChannel = FileChannel.open(filePath, options);
             }
-        }catch(IOException io){
+        } catch (IOException io) {
             System.out.println("Couldn't open file!");
         }
     }
@@ -90,36 +89,44 @@ public class Tracker {
         return diff.stream().skip(nextRand).iterator().nextInt();
     }
 
-    byte[] getPiece(int pieceIndex){
+    void setPeerHasPiece(int peerId, int pieceIndex) {
+        if (peerBitField.containsKey(peerId)) {
+            peerBitField.get(peerId).set(pieceIndex);
+        }
+    }
+
+    byte[] getPiece(int pieceIndex) {
         ByteBuffer byteBuffer = ByteBuffer.allocate(Config.getInstance().getPieceSize());
         byte[] piece = new byte[Config.getInstance().getPieceSize()];
         try {
             FileLock fileLock = fileChannel.lock();
             fileChannel.position(pieceIndex * Config.getInstance().getPieceSize());
-            while(byteBuffer.remaining() > 0) {
-                fileChannel.read(byteBuffer);
+            while (byteBuffer.hasRemaining()) {
+                if (fileChannel.read(byteBuffer) == -1) {
+                    break;
+                }
             }
             fileLock.release();
             byteBuffer.flip();
             piece = byteBuffer.array();
-        }catch(IOException io){
+        } catch (IOException io) {
             System.out.println("Error getting piece at index " + pieceIndex);
         }
         return piece;
     }
 
-    void putPiece(int pieceIndex, byte[] piece){
+    void putPiece(int pieceIndex, byte[] piece) {
         ByteBuffer byteBuffer = ByteBuffer.allocate(Config.getInstance().getPieceSize());
         byteBuffer.put(piece);
         byteBuffer.flip();
         try {
             FileLock fileLock = fileChannel.lock();
             fileChannel.position(pieceIndex * Config.getInstance().getPieceSize());
-            while(byteBuffer.hasRemaining()) {
+            while (byteBuffer.hasRemaining()) {
                 fileChannel.write(byteBuffer);
             }
             fileLock.release();
-        }catch(IOException io){
+        } catch (IOException io) {
             System.out.println("Error writing piece to index " + pieceIndex);
         }
     }

@@ -12,10 +12,8 @@ public class peerProcess {
 
     public static void main(String[] args) {
         int peerId, indexPeers;
-        Logger logger;
         final int listeningPortNumber;
         List<Peer> peerListComplete;
-        Tracker tracker;
 
         if (args.length == 0) {
             System.out.println("Peer ID is not specified. Exiting!");
@@ -35,8 +33,6 @@ public class peerProcess {
             System.out.println("Unable to read configuration. Exiting!");
             return;
         }
-
-        logger = Logger.getInstance();
 
         peerListComplete = Config.getInstance().getPeerList();
 
@@ -87,8 +83,6 @@ public class peerProcess {
                 System.out.println("Failed to initiate connection with " + peer.getHostName());
             }
         }
-
-
     }
 }
 

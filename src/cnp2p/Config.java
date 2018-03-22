@@ -33,6 +33,7 @@ public class Config {
             fileSize = Integer.parseInt(commonProp.getProperty("FileSize"));
             pieceSize = Integer.parseInt(commonProp.getProperty("PieceSize"));
         } catch (IOException e) {
+            System.out.println("Unable to read config file");
             e.printStackTrace();
         }
         readPeerInfo();
@@ -49,7 +50,7 @@ public class Config {
         return instance;
     }
 
-    public boolean getHasFile(){
+    public boolean getHasFile() {
         return hasFile;
     }
 
@@ -75,7 +76,8 @@ public class Config {
             }
             reader.close();
         } catch (Exception e) {
-            return;
+            System.out.println("Unable to read peer config file");
+            e.printStackTrace();
         }
     }
 
