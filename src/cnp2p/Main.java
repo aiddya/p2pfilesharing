@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public class peerProcess {
+public class Main {
     private static List<ConnectionHandler> connectionHandlerList;
 
     public static void main(String[] args) {
@@ -85,5 +85,3 @@ public class peerProcess {
         }
     }
 }
-
-

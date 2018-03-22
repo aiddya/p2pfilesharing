@@ -37,7 +37,7 @@ public class Tracker {
                 fileChannel = FileChannel.open(filePath, options);
             }
         } catch (IOException io) {
-            System.out.println("Couldn't open file!");
+            System.out.println("Unable to open " + Config.getInstance().getFileName() + " file!");
         }
     }
 
@@ -141,5 +141,4 @@ public class Tracker {
             System.out.println("Error writing piece to index " + pieceIndex);
         }
     }
-
 }

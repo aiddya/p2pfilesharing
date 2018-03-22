@@ -12,7 +12,6 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 
 class Logger {
-
     private static Logger loggerInstance;
     private int peerID;
     private Path logFilePath;
@@ -133,5 +132,4 @@ class Logger {
                 + "has downloaded the complete file.";
         writeToFile(message);
     }
-
 }

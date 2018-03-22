@@ -20,7 +20,7 @@ public class Config {
         Properties commonProp = new Properties();
         try {
             String commonConfig = "Config.cfg";
-            ClassLoader classLoader = peerProcess.class.getClassLoader();
+            ClassLoader classLoader = Main.class.getClassLoader();
             URL res = Objects.requireNonNull(classLoader.getResource(commonConfig),
                     "Can't find configuration file Config.cfg");
             InputStream is = new FileInputStream(res.getFile());
