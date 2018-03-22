@@ -150,4 +150,17 @@ public class Message implements Externalizable {
             return -1;
         }
     }
+
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Length: ");
+        if (payload != null) {
+            sb.append(payload.length + 1);
+        } else {
+            sb.append(1);
+        }
+        sb.append(" Message Type: ");
+        sb.append(messageType.name());
+        return sb.toString();
+    }
 }
