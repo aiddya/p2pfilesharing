@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.BitSet;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Random;
 
 public class Tracker {
@@ -20,6 +21,7 @@ public class Tracker {
     private Hashtable<Integer, BitSet> peerBitField;
     private Path filePath;
     private FileChannel fileChannel;
+    private static List<ConnectionHandler> connectionHandlerList;
 
     private Tracker() {
         numPieces = (Config.getInstance().getFileSize() - 1) / Config.getInstance().getPieceSize() + 1;
@@ -61,6 +63,14 @@ public class Tracker {
         byte[] temp = bitField.toByteArray();
         System.arraycopy(temp, 0, output, 0, temp.length);
         return output;
+    }
+
+    void setConnectionHandlerList(List<ConnectionHandler> connectionHandlerList){
+        this.connectionHandlerList = connectionHandlerList;
+    }
+
+    List<ConnectionHandler> getConnectionHandlerList(){
+        return connectionHandlerList;
     }
 
     void setBit(int pieceIndex) {
