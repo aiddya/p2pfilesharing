@@ -1,9 +1,7 @@
 package cnp2p;
 
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.ServerSocket;
 import java.net.Socket;
 
 public class ConnectionHandler extends Thread {
@@ -101,14 +99,7 @@ public class ConnectionHandler extends Thread {
                     Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
                 }
             }
-
-            Thread receiverThread = new Thread(() -> {
-
-            });
-
-            receiverThread.start();
-
-            
+            Thread.sleep(600000);
 
         } catch (Exception e) {
             System.out.println("Encountered an error while communicating with a peer");
