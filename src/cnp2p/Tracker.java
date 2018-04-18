@@ -54,8 +54,8 @@ public class Tracker {
         return instance;
     }
 
-    boolean isFileEmpty() {
-        return bitField.cardinality() == 0;
+    int getNumberPieces() {
+        return bitField.cardinality();
     }
 
     byte[] getBitField() {
