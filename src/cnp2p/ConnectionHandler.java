@@ -1,5 +1,6 @@
 package cnp2p;
 
+import javax.sound.midi.Track;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
@@ -147,6 +148,7 @@ public class ConnectionHandler extends Thread {
 
             Thread receiverThread = new Thread(() -> {
                 Message msg, newMessage;
+                int pieceIndex;
                 while (true) {
                     try {
                         msg = (Message) inputStream.readObject();
@@ -156,8 +158,9 @@ public class ConnectionHandler extends Thread {
                                 break;
                             case UNCHOKE:
                                 myStatus = ChokeStatus.UNCHOKED;
-                                int pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId);
+                                pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId);
                                 if(pieceIndex != -1) {
+                                    Tracker.getInstance().setPieceRequested(pieceIndex);
                                     newMessage = new Message(MessageType.REQUEST, pieceIndex);
                                     messageQueue.put(newMessage);
                                 }
@@ -198,6 +201,14 @@ public class ConnectionHandler extends Thread {
                                 for(ConnectionHandler connection : Tracker.getInstance().getConnectionHandlerList()){
                                     connection.addMessage(new Message(MessageType.HAVE, msg.getIndex()));
                                 }
+                                if(myStatus == UNCHOKED){
+                                    pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId);
+                                    if(pieceIndex != -1) {
+                                        Tracker.getInstance().setPieceRequested(pieceIndex);
+                                        newMessage = new Message(MessageType.REQUEST, pieceIndex);
+                                        messageQueue.put(newMessage);
+                                    }
+                                }
                                 break;
                         }
                     }catch(Exception ex){
@@ -210,13 +221,6 @@ public class ConnectionHandler extends Thread {
 
             Message message;
             while(true){
-                if(messageQueue.poll() == null){
-                    myStatus = ChokeStatus.UNCHOKED;
-                    int pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId);
-                    if(pieceIndex != -1) {
-                        messageQueue.put(new Message(MessageType.REQUEST, pieceIndex));
-                    }
-                }
                 message = messageQueue.take();
                 switch(message.getType()){
                     case CHOKE:
