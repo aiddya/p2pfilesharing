@@ -129,6 +129,5 @@ public class Main {
         Timer optUnchokeTimer = new Timer("OptimisticallyUnchokeAlgorithm");
         optUnchokeTimer.scheduleAtFixedRate(optUnchokeTask, 0, Config.getInstance().getOptimisticUnchokingInterval() * 1000);
         
-        
     }
 }

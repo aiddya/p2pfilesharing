@@ -1,8 +1,5 @@
 package cnp2p;
 
-import sun.rmi.runtime.Log;
-
-import javax.sound.midi.Track;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
@@ -21,35 +18,39 @@ public class ConnectionHandler extends Thread {
     private int remotePeerId;
     private boolean incomingConnection;
     private boolean remoteInterested;
-
-    public ChokeStatus getMyStatus() {
-        return myStatus;
-    }
-
-    public void setMyStatus(ChokeStatus myStatus) {
-        this.myStatus = myStatus;
-    }
-
-    public ChokeStatus getPeerStatus() {
-        return peerStatus;
-    }
-
-    public void setPeerStatus(ChokeStatus peerStatus) {
-        this.peerStatus = peerStatus;
-    }
-
-    public double getDownloadRate() {
-        return downloadRate;
-    }
-
-    public void setDownloadRate(double downloadRate) {
-        this.downloadRate = downloadRate;
-    }
-
+    private boolean interested;
     private ChokeStatus myStatus;
     private ChokeStatus peerStatus;
     private double downloadRate = 0;
     private final BlockingQueue<Message> messageQueue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
+
+    public boolean isRemoteInterested() {
+        return remoteInterested;
+    }
+
+    public boolean isInterested() {
+        return interested;
+    }
+
+    ChokeStatus getMyStatus() {
+        return myStatus;
+    }
+
+    void setMyStatus(ChokeStatus myStatus) {
+        this.myStatus = myStatus;
+    }
+
+    ChokeStatus getPeerStatus() {
+        return peerStatus;
+    }
+
+    void setPeerStatus(ChokeStatus peerStatus) {
+        this.peerStatus = peerStatus;
+    }
+
+    double getDownloadRate() {
+        return downloadRate;
+    }
 
     ConnectionHandler(Socket connection, int localPeerId) {
         this.connection = connection;
@@ -208,6 +209,7 @@ public class ConnectionHandler extends Thread {
                                 for(ConnectionHandler connection : Tracker.getInstance().getConnectionHandlerList()){
                                     connection.addMessage(new Message(MessageType.HAVE, msg.getIndex()));
                                 }
+                                downloadRate++;
                                 Logger.getInstance().downloadedPieceFrom(remotePeerId, msg.getIndex(), Tracker.getInstance().getNumberPieces());
                                 if(myStatus == UNCHOKED){
                                     pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId);
@@ -232,11 +234,23 @@ public class ConnectionHandler extends Thread {
                 message = messageQueue.take();
                 switch(message.getType()){
                     case CHOKE:
+                        setPeerStatus(CHOKED);
+                        outputStream.writeObject(message);
+                        break;
                     case UNCHOKE:
+                        setPeerStatus(UNCHOKED);
+                        outputStream.writeObject(message);
+                        break;
+                    case INTERESTED:
+                        interested = true;
+                        outputStream.writeObject(message);
+                        break;
+                    case NOT_INTERESTED:
+                        interested = false;
+                        outputStream.writeObject(message);
+                        break;
                     case HAVE:
                     case BITFIELD:
-                    case INTERESTED:
-                    case NOT_INTERESTED:
                     case REQUEST:
                     case PIECE:
                         outputStream.writeObject(message);
