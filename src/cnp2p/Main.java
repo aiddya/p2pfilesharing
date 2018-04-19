@@ -3,12 +3,7 @@ package cnp2p;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -91,49 +86,48 @@ public class Main {
             }
         }
 
-
-        Thread unchokingThread = new Thread(() -> {
-            try {
-                while (true) {
-            			Collections.sort(connectionHandlerList, Collections.reverseOrder(Comparator.comparingDouble(ConnectionHandler :: getDownloadRate)));
-            			int i=0;
-            			for(ConnectionHandler preferred : connectionHandlerList) {
-            				if((preferred.getPeerStatus() == ChokeStatus.CHOKED || preferred.getPeerStatus() == null || preferred.getPeerStatus() == ChokeStatus.OPT_UNCHOKED) && i < Config.getInstance().getPreferredNeighbors()) {
-	                        Message unchoke = new Message(MessageType.UNCHOKE);
-	                        preferred.addMessage(unchoke);
-            				}
-            				i++;
-            			}
-            			for(int j= Config.getInstance().getPreferredNeighbors(); j < connectionHandlerList.size(); j++) {
-            				if(connectionHandlerList.get(j).getMyStatus() != ChokeStatus.OPT_UNCHOKED) {
-	                        Message choke = new Message(MessageType.CHOKE);
-	                        connectionHandlerList.get(j).addMessage(choke);
-            				}
-            			}
-            			Thread.sleep(Config.getInstance().getUnchokingInterval() * 1000);
+        TimerTask unchokeTask = new TimerTask() {
+            public void run() {
+                int k = Config.getInstance().getPreferredNeighbors();
+                Collections.sort(connectionHandlerList, Collections.reverseOrder(Comparator.comparingDouble(ConnectionHandler :: getDownloadRate)));
+                for(ConnectionHandler connection : connectionHandlerList){
+                    if(connection.isRemoteInterested() && k != 0){
+                        if(connection.getPeerStatus() == ChokeStatus.CHOKED) {
+                            Message choke = new Message(MessageType.UNCHOKE);
+                            connection.addMessage(choke);
+                        }
+                        k--;
+                    }else{
+                        Message choke = new Message(MessageType.CHOKE);
+                        connection.addMessage(choke);
+                    }
                 }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
             }
-        });
+        };
+        Timer unchokeTimer = new Timer("UnchokeAlgorithm");
+        unchokeTimer.scheduleAtFixedRate(unchokeTask, 0, Config.getInstance().getUnchokingInterval() * 1000);
 
-        unchokingThread.start();
-        
-        Thread opt_unchokingThread = new Thread(() -> {
-            try {
-                while (true) {
-                		Message opt_unchoke = new Message(MessageType.UNCHOKE);
-            			ConnectionHandler optUnchokedHandler = connectionHandlerList.get(ThreadLocalRandom.current().nextInt(Config.getInstance().getPreferredNeighbors(), connectionHandlerList.size()));
-            			optUnchokedHandler.addMessage(opt_unchoke);
-            			optUnchokedHandler.setMyStatus(ChokeStatus.OPT_UNCHOKED);
-            			Thread.sleep(Config.getInstance().getOptimisticUnchokingInterval() * 1000);
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        });
+        TimerTask optUnchokeTask = new TimerTask(){
+          public void run() {
+              int chokeCount = 0;
+              for(ConnectionHandler connection : connectionHandlerList) {
+                  if(connection.getPeerStatus() == ChokeStatus.CHOKED)
+                      chokeCount++;
+              }
 
-        opt_unchokingThread.start();
+              Random rand = new Random();
+              int randValue = rand.nextInt(chokeCount);
+
+              for(ConnectionHandler connection : connectionHandlerList) {
+                  if(connection.getPeerStatus() == ChokeStatus.CHOKED && randValue-- == 0) {
+                      Message choke = new Message(MessageType.UNCHOKE);
+                      connection.addMessage(choke);
+                  }
+              }
+          }
+        };
+        Timer optUnchokeTimer = new Timer("OptimisticallyUnchokeAlgorithm");
+        optUnchokeTimer.scheduleAtFixedRate(optUnchokeTask, 0, Config.getInstance().getOptimisticUnchokingInterval() * 1000);
         
         
     }
