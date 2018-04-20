@@ -77,7 +77,7 @@ public class Message implements Externalizable {
             out.write(ByteBuffer.allocate(4).putInt(pieceIndex).array());
         }
 
-        if (payload != null) {
+        if (messageType == BITFIELD || messageType == PIECE) {
             out.write(payload);
         }
 
@@ -100,11 +100,11 @@ public class Message implements Externalizable {
                 || messageType == UNCHOKE
                 || messageType == INTERESTED
                 || messageType == NOT_INTERESTED) && length != 1) {
-            throw new ClassNotFoundException("Invalid message length, expected 1");
+            throw new ClassNotFoundException("Invalid message length, expected 1 got " + length);
         } else if ((messageType == HAVE || messageType == REQUEST) && length != 5) {
-            throw new ClassNotFoundException("Invalid message length, expected 5");
+            throw new ClassNotFoundException("Invalid message length, expected 5 got " + length);
         } else if (messageType == PIECE && length < 6) {
-            throw new ClassNotFoundException("Invalid message length, too short");
+            throw new ClassNotFoundException("Invalid message length, too short. Expected >=6, got " + length);
         }
 
         if (length > 1) {

@@ -89,7 +89,7 @@ public class Main {
             public void run() {
                 ArrayList<ConnectionHandler> currentList = new ArrayList<>(connectionHandlerList);
                 currentList
-                        .sort(Collections.reverseOrder(Comparator.comparingDouble(ConnectionHandler::getDownloadRate)));
+                        .sort(Collections.reverseOrder(Comparator.comparingInt(ConnectionHandler::getDownloadRate)));
                 int connectionsCount = currentList.size();
                 int prefCount = Config.getInstance().getPreferredNeighbors();
                 boolean neighboursChanged = false;
@@ -118,6 +118,7 @@ public class Main {
                         Message choke = new Message(MessageType.CHOKE);
                         connection.addMessage(choke);
                     }
+                    connection.setDownloadRate(0);
                 }
 
                 if (neighboursChanged) {

@@ -23,7 +23,7 @@ public class ConnectionHandler extends Thread {
     private boolean localInterested;
     private ChokeStatus localStatus;
     private ChokeStatus remoteStatus;
-    private double downloadRate = 0;
+    private int downloadRate = 0;
 
     ConnectionHandler(Socket connection, int localPeerId) {
         this.connection = connection;
@@ -54,8 +54,12 @@ public class ConnectionHandler extends Thread {
         return remoteStatus;
     }
 
-    double getDownloadRate() {
+    int getDownloadRate() {
         return downloadRate;
+    }
+
+    void setDownloadRate(int downloadRate) {
+        this.downloadRate = downloadRate;
     }
 
     void addMessage(Message msg) {
@@ -179,68 +183,68 @@ public class ConnectionHandler extends Thread {
                     }
 
                     switch (msg.getType()) {
-                    case CHOKE:
-                        Logger.getInstance().chokedBy(remotePeerId);
-                        localStatus = CHOKED;
-                        break;
-                    case UNCHOKE:
-                        Logger.getInstance().unchokedBy(remotePeerId);
-                        localStatus = UNCHOKED;
-                        pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
-                        if (pieceIndex != -1) {
-                            newMessage = new Message(REQUEST, pieceIndex);
-                            addMessage(newMessage);
-                        }
-                        break;
-                    case HAVE:
-                        Logger.getInstance().receivedHaveFrom(remotePeerId, msg.getIndex());
-                        Tracker.getInstance().setPeerHasPiece(remotePeerId, msg.getIndex());
-                        newMessage = updateInterestedStatus();
-                        if (newMessage != null) {
-                            addMessage(newMessage);
-                        }
-                        break;
-                    case BITFIELD:
-                        Tracker.getInstance().setPeerBitField(remotePeerId, msg.getPayload());
-                        newMessage = updateInterestedStatus();
-                        if (newMessage != null) {
-                            addMessage(newMessage);
-                        }
-                        break;
-                    case INTERESTED:
-                        remoteInterested = true;
-                        Logger.getInstance().receivedInterestedFrom(remotePeerId);
-                        break;
-                    case NOT_INTERESTED:
-                        remoteInterested = false;
-                        Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
-                        break;
-                    case REQUEST:
-                        if (remoteStatus == UNCHOKED) {
-                            byte[] piece = Tracker.getInstance().getPiece(msg.getIndex());
-                            newMessage = new Message(PIECE, msg.pieceIndex, piece);
-                            addMessage(newMessage);
-                        }
-                        break;
-                    case PIECE:
-                        Tracker.getInstance().putPiece(msg.getIndex(), msg.getPayload());
-                        Tracker.getInstance().setBit(msg.getIndex());
-                        for (ConnectionHandler connection : Tracker.getInstance().getConnectionHandlerList()) {
-                            connection.addMessage(new Message(HAVE, msg.getIndex()));
-                        }
-                        downloadRate++;
-                        Logger.getInstance().downloadedPieceFrom(remotePeerId, msg.getIndex(),
-                                Tracker.getInstance().getNumberPieces());
-                        if (Tracker.getInstance().isFileComplete()) {
-                            Logger.getInstance().downloadedFile();
-                        } else if (localStatus == UNCHOKED) {
+                        case CHOKE:
+                            Logger.getInstance().chokedBy(remotePeerId);
+                            localStatus = CHOKED;
+                            break;
+                        case UNCHOKE:
+                            Logger.getInstance().unchokedBy(remotePeerId);
+                            localStatus = UNCHOKED;
                             pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
                             if (pieceIndex != -1) {
                                 newMessage = new Message(REQUEST, pieceIndex);
                                 addMessage(newMessage);
                             }
-                        }
-                        break;
+                            break;
+                        case HAVE:
+                            Logger.getInstance().receivedHaveFrom(remotePeerId, msg.getIndex());
+                            Tracker.getInstance().setPeerHasPiece(remotePeerId, msg.getIndex());
+                            newMessage = updateInterestedStatus();
+                            if (newMessage != null) {
+                                addMessage(newMessage);
+                            }
+                            break;
+                        case BITFIELD:
+                            Tracker.getInstance().setPeerBitField(remotePeerId, msg.getPayload());
+                            newMessage = updateInterestedStatus();
+                            if (newMessage != null) {
+                                addMessage(newMessage);
+                            }
+                            break;
+                        case INTERESTED:
+                            remoteInterested = true;
+                            Logger.getInstance().receivedInterestedFrom(remotePeerId);
+                            break;
+                        case NOT_INTERESTED:
+                            remoteInterested = false;
+                            Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
+                            break;
+                        case REQUEST:
+                            if (remoteStatus == UNCHOKED) {
+                                byte[] piece = Tracker.getInstance().getPiece(msg.getIndex());
+                                newMessage = new Message(PIECE, msg.pieceIndex, piece);
+                                addMessage(newMessage);
+                            }
+                            break;
+                        case PIECE:
+                            Tracker.getInstance().putPiece(msg.getIndex(), msg.getPayload());
+                            Tracker.getInstance().setBit(msg.getIndex());
+                            for (ConnectionHandler connection : Tracker.getInstance().getConnectionHandlerList()) {
+                                connection.addMessage(new Message(HAVE, msg.getIndex()));
+                            }
+                            downloadRate++;
+                            Logger.getInstance().downloadedPieceFrom(remotePeerId, msg.getIndex(),
+                                    Tracker.getInstance().getNumberPieces());
+                            if (Tracker.getInstance().isFileComplete()) {
+                                Logger.getInstance().downloadedFile();
+                            } else if (localStatus == UNCHOKED) {
+                                pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
+                                if (pieceIndex != -1) {
+                                    newMessage = new Message(REQUEST, pieceIndex);
+                                    addMessage(newMessage);
+                                }
+                            }
+                            break;
                     }
                 }
             });
@@ -251,14 +255,14 @@ public class ConnectionHandler extends Thread {
             while (connectionAlive) {
                 message = messageQueue.take();
                 switch (message.getType()) {
-                case CHOKE:
-                    remoteStatus = CHOKED;
-                    break;
-                case UNCHOKE:
-                    remoteStatus = UNCHOKED;
-                    break;
-                default:
-                    break;
+                    case CHOKE:
+                        remoteStatus = CHOKED;
+                        break;
+                    case UNCHOKE:
+                        remoteStatus = UNCHOKED;
+                        break;
+                    default:
+                        break;
                 }
 
                 try {
