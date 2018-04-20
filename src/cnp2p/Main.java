@@ -86,11 +86,19 @@ public class Main {
 
         TimerTask unchokeTask = new TimerTask() {
             public void run() {
-                int k = Config.getInstance().getPreferredNeighbors();
+                int k = Config.getInstance().getPreferredNeighbors(), connectionsCount = connectionHandlerList.size();
+                int[] peerIds;
                 connectionHandlerList.sort(Collections.reverseOrder(Comparator.comparingDouble(ConnectionHandler::getDownloadRate)));
-                int[] peerIds = new int[k];
+                if(k >= connectionHandlerList.size()){
+                    peerIds = new int[connectionsCount];
+                } else
+                    peerIds = new int[k];
                 for (ConnectionHandler connection : connectionHandlerList) {
-                    if (connection.isRemoteInterested() && k != 0) {
+                    if(Config.getInstance().getPreferredNeighbors() >= connectionHandlerList.size()){
+                        Message choke = new Message(MessageType.UNCHOKE);
+                        connection.addMessage(choke);
+                        peerIds[--connectionsCount] = connection.getRemotePeerId();
+                    } else if (connection.isRemoteInterested() && k != 0) {
                         if (connection.getRemoteStatus() == ChokeStatus.CHOKED) {
                             Message choke = new Message(MessageType.UNCHOKE);
                             connection.addMessage(choke);

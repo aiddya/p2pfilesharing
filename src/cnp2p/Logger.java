@@ -51,11 +51,11 @@ class Logger {
         byteBuffer.put(System.getProperty("line.separator").getBytes());
         byteBuffer.flip();
         try {
-            FileLock fileLock = fileChannel.lock();
-            while (byteBuffer.hasRemaining()) {
-                fileChannel.write(byteBuffer);
+            synchronized(this) {
+                while (byteBuffer.hasRemaining()) {
+                    fileChannel.write(byteBuffer);
+                }
             }
-            fileLock.release();
         } catch (IOException ex) {
             ex.printStackTrace();
         }
@@ -86,7 +86,7 @@ class Logger {
 
     void optUnchokedNeighborChanged(int peerID) {
         String message = simpleDateFormat.format(calendar.getTime()) + ": Peer " + this.peerID
-                + "has the optimistically unchoked neighbor" + peerID;
+                + " has the optimistically unchoked neighbor " + peerID;
         writeToFile(message);
     }
 
