@@ -86,62 +86,74 @@ public class Main {
 
         TimerTask unchokeTask = new TimerTask() {
             public void run() {
-                int k = Config.getInstance().getPreferredNeighbors(), connectionsCount = connectionHandlerList.size();
+                ArrayList<ConnectionHandler> currentList = new ArrayList<>(connectionHandlerList);
+                currentList.sort(Collections.reverseOrder(Comparator.comparingDouble(ConnectionHandler::getDownloadRate)));
+                int connectionsCount = currentList.size();
+                int prefCount = Config.getInstance().getPreferredNeighbors();
+                boolean neighboursChanged = false;
                 int[] peerIds;
-                connectionHandlerList.sort(Collections.reverseOrder(Comparator.comparingDouble(ConnectionHandler::getDownloadRate)));
-                if(k >= connectionHandlerList.size()){
-                    peerIds = new int[connectionsCount];
-                } else
-                    peerIds = new int[k];
-                for (ConnectionHandler connection : connectionHandlerList) {
-                    if(Config.getInstance().getPreferredNeighbors() >= connectionHandlerList.size()){
-                        Message choke = new Message(MessageType.UNCHOKE);
-                        connection.addMessage(choke);
-                        peerIds[--connectionsCount] = connection.getRemotePeerId();
-                    } else if (connection.isRemoteInterested() && k != 0) {
-                        if (connection.getRemoteStatus() == ChokeStatus.CHOKED) {
-                            Message choke = new Message(MessageType.UNCHOKE);
-                            connection.addMessage(choke);
+
+                if (connectionsCount == 0) {
+                    return;
+                } else if (prefCount > connectionsCount) {
+                    prefCount = connectionsCount;
+                }
+
+                peerIds = new int[prefCount];
+
+                for (ConnectionHandler connection : currentList) {
+                    if (connection.isRemoteInterested() && prefCount != 0) {
+                        if (connection.getRemoteStatus() != ChokeStatus.UNCHOKED) {
+                            neighboursChanged = true;
+                            Message unchoke = new Message(MessageType.UNCHOKE);
+                            connection.addMessage(unchoke);
                         }
-                        peerIds[--k] = connection.getRemotePeerId();
-                    } else {
+                        peerIds[--prefCount] = connection.getRemotePeerId();
+                    } else if (connection.getRemoteStatus() != ChokeStatus.CHOKED && prefCount == 0) {
+                        if (connection.getRemoteStatus() != ChokeStatus.UNKNOWN) {
+                            neighboursChanged = true;
+                        }
                         Message choke = new Message(MessageType.CHOKE);
                         connection.addMessage(choke);
                     }
                 }
-                Logger.getInstance().preferredNeighborsChanged(peerIds);
+
+                if (neighboursChanged) {
+                    Logger.getInstance().preferredNeighborsChanged(peerIds);
+                }
             }
         };
+
         Timer unchokeTimer = new Timer("UnchokeAlgorithm");
         unchokeTimer.scheduleAtFixedRate(unchokeTask, 0, Config.getInstance().getUnchokingInterval() * 1000);
 
         TimerTask optUnchokeTask = new TimerTask() {
             public void run() {
-                int chokeCount = 0;
+                ArrayList<ConnectionHandler> chokedConnections = new ArrayList<>();
                 for (ConnectionHandler connection : connectionHandlerList) {
-                    if (connection.getRemoteStatus() == ChokeStatus.CHOKED)
-                        chokeCount++;
+                    if (connection.getRemoteStatus() != ChokeStatus.UNCHOKED && connection.isRemoteInterested()) {
+                        chokedConnections.add(connection);
+                    }
                 }
 
-                if (chokeCount == 0) {
+                if (chokedConnections.isEmpty()) {
                     return;
                 }
 
                 Random rand = new Random();
-                int randValue = rand.nextInt(chokeCount);
+                int randValue = rand.nextInt(chokedConnections.size());
 
-                for (ConnectionHandler connection : connectionHandlerList) {
-                    if (connection.getRemoteStatus() == ChokeStatus.CHOKED && randValue-- == 0) {
-                        Message choke = new Message(MessageType.UNCHOKE);
-                        connection.addMessage(choke);
-                        Logger.getInstance().optUnchokedNeighborChanged(connection.getRemotePeerId());
-                        break;
-                    }
+                ConnectionHandler connection = chokedConnections.get(randValue);
+
+                if (connection.getRemoteStatus() != ChokeStatus.UNCHOKED) {
+                    Message unchoke = new Message(MessageType.UNCHOKE);
+                    connection.addMessage(unchoke);
+                    Logger.getInstance().optUnchokedNeighborChanged(connection.getRemotePeerId());
                 }
             }
         };
+
         Timer optUnchokeTimer = new Timer("OptimisticallyUnchokeAlgorithm");
         optUnchokeTimer.scheduleAtFixedRate(optUnchokeTask, 0, Config.getInstance().getOptimisticUnchokingInterval() * 1000);
-
     }
 }

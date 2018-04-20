@@ -3,7 +3,6 @@ package cnp2p;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -51,7 +50,7 @@ class Logger {
         byteBuffer.put(System.getProperty("line.separator").getBytes());
         byteBuffer.flip();
         try {
-            synchronized(this) {
+            synchronized (this) {
                 while (byteBuffer.hasRemaining()) {
                     fileChannel.write(byteBuffer);
                 }

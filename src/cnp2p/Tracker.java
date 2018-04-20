@@ -31,11 +31,11 @@ public class Tracker {
         filePath = Paths.get(Config.getInstance().getCurrentDirectory(), Config.getInstance().getFileName());
         try {
             if (Config.getInstance().getHasFile()) {
-                OpenOption[] options = new OpenOption[]{StandardOpenOption.READ, StandardOpenOption.SYNC};
+                OpenOption[] options = new OpenOption[] { StandardOpenOption.READ, StandardOpenOption.SYNC };
                 fileChannel = FileChannel.open(filePath, options);
             } else {
-                OpenOption[] options = new OpenOption[]{StandardOpenOption.WRITE, StandardOpenOption.CREATE,
-                        StandardOpenOption.SYNC};
+                OpenOption[] options = new OpenOption[] { StandardOpenOption.WRITE, StandardOpenOption.CREATE,
+                        StandardOpenOption.SYNC };
                 fileChannel = FileChannel.open(filePath, options);
             }
         } catch (IOException io) {
@@ -83,6 +83,10 @@ public class Tracker {
 
     void setPeerBitField(int peerId, byte[] peerField) {
         peerBitField.put(peerId, BitSet.valueOf(peerField));
+    }
+
+    boolean isFileComplete() {
+        return bitField.cardinality() == numPieces;
     }
 
     int getNewRandomPieceNumber(int peerId, boolean setRequested) {
