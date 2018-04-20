@@ -1,11 +1,15 @@
 package cnp2p;
 
+import java.io.EOFException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+
 import static cnp2p.ChokeStatus.*;
+import static cnp2p.MessageType.*;
 
 public class ConnectionHandler extends Thread {
     private static final int QUEUE_CAPACITY = 50;
@@ -83,23 +87,23 @@ public class ConnectionHandler extends Thread {
                 Message incomingBitField;
                 incomingBitField = (Message) inputStream.readObject();
                 Tracker.getInstance().setPeerBitField(remotePeerId, incomingBitField.getPayload());
-                Message outgoingBitField = new Message(MessageType.BITFIELD, Tracker.getInstance().getBitField());
+                Message outgoingBitField = new Message(BITFIELD, Tracker.getInstance().getBitField());
                 outputStream.writeObject(outgoingBitField);
                 outputStream.flush();
 
                 Message iint = (Message) inputStream.readObject();
-                if (iint.getType() == MessageType.INTERESTED) {
+                if (iint.getType() == INTERESTED) {
                     remoteInterested = true;
                     Logger.getInstance().receivedInterestedFrom(remotePeerId);
-                } else if (iint.getType() == MessageType.NOT_INTERESTED) {
+                } else if (iint.getType() == NOT_INTERESTED) {
                     remoteInterested = false;
                     Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
                 }
                 Message oint;
                 if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
-                    oint = new Message(MessageType.INTERESTED);
+                    oint = new Message(INTERESTED);
                 } else {
-                    oint = new Message(MessageType.NOT_INTERESTED);
+                    oint = new Message(NOT_INTERESTED);
                 }
                 outputStream.writeObject(oint);
                 outputStream.flush();
@@ -114,7 +118,7 @@ public class ConnectionHandler extends Thread {
                 }
 
                 Logger.getInstance().tcpConnectionEstablishedTo(remotePeerId);
-                Message outgoingBitField = new Message(MessageType.BITFIELD, Tracker.getInstance().getBitField());
+                Message outgoingBitField = new Message(BITFIELD, Tracker.getInstance().getBitField());
                 outputStream.writeObject(outgoingBitField);
                 outputStream.flush();
                 Message incomingBitField = (Message) inputStream.readObject();
@@ -122,17 +126,17 @@ public class ConnectionHandler extends Thread {
 
                 Message oint;
                 if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
-                    oint = new Message(MessageType.INTERESTED);
+                    oint = new Message(INTERESTED);
                 } else {
-                    oint = new Message(MessageType.NOT_INTERESTED);
+                    oint = new Message(NOT_INTERESTED);
                 }
                 outputStream.writeObject(oint);
                 outputStream.flush();
                 Message iint = (Message) inputStream.readObject();
-                if (iint.getType() == MessageType.INTERESTED) {
+                if (iint.getType() == INTERESTED) {
                     remoteInterested = true;
                     Logger.getInstance().receivedInterestedFrom(remotePeerId);
-                } else if (iint.getType() == MessageType.NOT_INTERESTED) {
+                } else if (iint.getType() == NOT_INTERESTED) {
                     remoteInterested = false;
                     Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
                 }
@@ -144,77 +148,85 @@ public class ConnectionHandler extends Thread {
                 while (true) {
                     try {
                         msg = (Message) inputStream.readObject();
-                        switch (msg.getType()) {
-                        case CHOKE:
-                            Logger.getInstance().chokedBy(remotePeerId);
-                            localStatus = CHOKED;
-                            break;
-                        case UNCHOKE:
-                            Logger.getInstance().unchokedBy(remotePeerId);
-                            localStatus = UNCHOKED;
+                    } catch (EOFException e) {
+                        System.out.println("Connection ended");
+                        return;
+                    } catch (SocketException e) {
+                        System.out.println("Connection ended");
+                        return;
+                    } catch (Exception e) {
+                        System.out.println("Encountered an error while receiving a message");
+                        e.printStackTrace();
+                        continue;
+                    }
+
+                    switch (msg.getType()) {
+                    case CHOKE:
+                        Logger.getInstance().chokedBy(remotePeerId);
+                        localStatus = CHOKED;
+                        break;
+                    case UNCHOKE:
+                        Logger.getInstance().unchokedBy(remotePeerId);
+                        localStatus = UNCHOKED;
+                        pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
+                        if (pieceIndex != -1) {
+                            newMessage = new Message(REQUEST, pieceIndex);
+                            addMessage(newMessage);
+                        }
+                        break;
+                    case HAVE:
+                        Logger.getInstance().receivedHaveFrom(remotePeerId, msg.getIndex());
+                        Tracker.getInstance().setPeerHasPiece(remotePeerId, msg.getIndex());
+                        if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
+                            newMessage = new Message(INTERESTED);
+                        } else {
+                            newMessage = new Message(NOT_INTERESTED);
+                        }
+                        addMessage(newMessage);
+                        break;
+                    case BITFIELD:
+                        Tracker.getInstance().setPeerBitField(remotePeerId, msg.getPayload());
+                        if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
+                            newMessage = new Message(INTERESTED);
+                        } else {
+                            newMessage = new Message(NOT_INTERESTED);
+                        }
+                        addMessage(newMessage);
+                        break;
+                    case INTERESTED:
+                        remoteInterested = true;
+                        Logger.getInstance().receivedInterestedFrom(remotePeerId);
+                        break;
+                    case NOT_INTERESTED:
+                        remoteInterested = false;
+                        Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
+                        break;
+                    case REQUEST:
+                        if (remoteStatus == UNCHOKED) {
+                            byte[] piece = Tracker.getInstance().getPiece(msg.getIndex());
+                            newMessage = new Message(PIECE, msg.pieceIndex, piece);
+                            addMessage(newMessage);
+                        }
+                        break;
+                    case PIECE:
+                        Tracker.getInstance().putPiece(msg.getIndex(), msg.getPayload());
+                        Tracker.getInstance().setBit(msg.getIndex());
+                        for (ConnectionHandler connection : Tracker.getInstance().getConnectionHandlerList()) {
+                            connection.addMessage(new Message(HAVE, msg.getIndex()));
+                        }
+                        downloadRate++;
+                        Logger.getInstance().downloadedPieceFrom(remotePeerId, msg.getIndex(),
+                                Tracker.getInstance().getNumberPieces());
+                        if (Tracker.getInstance().isFileComplete()) {
+                            Logger.getInstance().downloadedFile();
+                        } else if (localStatus == UNCHOKED) {
                             pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
                             if (pieceIndex != -1) {
-                                newMessage = new Message(MessageType.REQUEST, pieceIndex);
-                                messageQueue.put(newMessage);
-                                System.out.println("Requested piece " + pieceIndex);
+                                newMessage = new Message(REQUEST, pieceIndex);
+                                addMessage(newMessage);
                             }
-                            break;
-                        case HAVE:
-                            Logger.getInstance().receivedHaveFrom(remotePeerId, msg.getIndex());
-                            Tracker.getInstance().setPeerHasPiece(remotePeerId, msg.getIndex());
-                            if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
-                                newMessage = new Message(MessageType.INTERESTED);
-                            } else {
-                                newMessage = new Message(MessageType.NOT_INTERESTED);
-                            }
-                            messageQueue.put(newMessage);
-                            break;
-                        case BITFIELD:
-                            Tracker.getInstance().setPeerBitField(remotePeerId, msg.getPayload());
-                            if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
-                                newMessage = new Message(MessageType.INTERESTED);
-                            } else {
-                                newMessage = new Message(MessageType.NOT_INTERESTED);
-                            }
-                            messageQueue.put(newMessage);
-                            break;
-                        case INTERESTED:
-                            remoteInterested = true;
-                            Logger.getInstance().receivedInterestedFrom(remotePeerId);
-                            break;
-                        case NOT_INTERESTED:
-                            remoteInterested = false;
-                            Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
-                            break;
-                        case REQUEST:
-                            if (remoteStatus == UNCHOKED) {
-                                newMessage = new Message(MessageType.PIECE,
-                                        Tracker.getInstance().getPiece(msg.getIndex()));
-                                messageQueue.put(newMessage);
-                            }
-                            break;
-                        case PIECE:
-                            Tracker.getInstance().putPiece(msg.getIndex(), msg.getPayload());
-                            Tracker.getInstance().setBit(msg.getIndex());
-                            for (ConnectionHandler connection : Tracker.getInstance().getConnectionHandlerList()) {
-                                connection.addMessage(new Message(MessageType.HAVE, msg.getIndex()));
-                            }
-                            downloadRate++;
-                            Logger.getInstance().downloadedPieceFrom(remotePeerId, msg.getIndex(),
-                                    Tracker.getInstance().getNumberPieces());
-                            if (Tracker.getInstance().isFileComplete()) {
-                                Logger.getInstance().downloadedFile();
-                            } else if (localStatus == UNCHOKED) {
-                                pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
-                                if (pieceIndex != -1) {
-                                    newMessage = new Message(MessageType.REQUEST, pieceIndex);
-                                    messageQueue.put(newMessage);
-                                }
-                            }
-                            break;
                         }
-                    } catch (Exception ex) {
-
+                        break;
                     }
                 }
             });
@@ -237,7 +249,8 @@ public class ConnectionHandler extends Thread {
 
                 try {
                     outputStream.writeObject(message);
-                } catch (java.net.SocketException se) {
+                    outputStream.flush();
+                } catch (SocketException se) {
                     connectionAlive = false;
                     System.out.println("Connection ended from peer " + localPeerId + " to " + remotePeerId + ": "
                             + se.getMessage());

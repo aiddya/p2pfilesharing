@@ -42,7 +42,6 @@ public class Main {
 
         List<Peer> peerListTrim = new ArrayList<>();
         connectionHandlerList = new CopyOnWriteArrayList<>();
-        Tracker.getInstance().setConnectionHandlerList(connectionHandlerList);
 
         for (indexPeers = 0; indexPeers < peerListComplete.size() &&
                 peerListComplete.get(indexPeers).getPeerId() != peerId; indexPeers++) {
@@ -54,6 +53,9 @@ public class Main {
             Config.getInstance().setHasFile(true);
             Tracker.getInstance().setAllBits();
         }
+
+        // This MUST be called after setHasFile
+        Tracker.getInstance().setConnectionHandlerList(connectionHandlerList);
 
         Thread listeningThread = new Thread(() -> {
             try {

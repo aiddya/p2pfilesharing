@@ -128,7 +128,7 @@ class Logger {
 
     void downloadedFile() {
         String message = simpleDateFormat.format(calendar.getTime()) + ": Peer " + this.peerID
-                + "has downloaded the complete file.";
+                + " has downloaded the complete file.";
         writeToFile(message);
     }
 }
