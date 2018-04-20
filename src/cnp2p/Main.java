@@ -5,9 +5,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
-import cnp2p.ChokeStatus;
+
 public class Main {
     private static List<ConnectionHandler> connectionHandlerList;
 
@@ -89,45 +87,53 @@ public class Main {
         TimerTask unchokeTask = new TimerTask() {
             public void run() {
                 int k = Config.getInstance().getPreferredNeighbors();
-                Collections.sort(connectionHandlerList, Collections.reverseOrder(Comparator.comparingDouble(ConnectionHandler :: getDownloadRate)));
-                for(ConnectionHandler connection : connectionHandlerList){
-                    if(connection.isRemoteInterested() && k != 0){
-                        if(connection.getPeerStatus() == ChokeStatus.CHOKED) {
+                connectionHandlerList.sort(Collections.reverseOrder(Comparator.comparingDouble(ConnectionHandler::getDownloadRate)));
+                int[] peerIds = new int[k];
+                for (ConnectionHandler connection : connectionHandlerList) {
+                    if (connection.isRemoteInterested() && k != 0) {
+                        if (connection.getRemoteStatus() == ChokeStatus.CHOKED) {
                             Message choke = new Message(MessageType.UNCHOKE);
                             connection.addMessage(choke);
                         }
-                        k--;
-                    }else{
+                        peerIds[--k] = connection.getRemotePeerId();
+                    } else {
                         Message choke = new Message(MessageType.CHOKE);
                         connection.addMessage(choke);
                     }
                 }
+                Logger.getInstance().preferredNeighborsChanged(peerIds);
             }
         };
         Timer unchokeTimer = new Timer("UnchokeAlgorithm");
         unchokeTimer.scheduleAtFixedRate(unchokeTask, 0, Config.getInstance().getUnchokingInterval() * 1000);
 
-        TimerTask optUnchokeTask = new TimerTask(){
-          public void run() {
-              int chokeCount = 0;
-              for(ConnectionHandler connection : connectionHandlerList) {
-                  if(connection.getPeerStatus() == ChokeStatus.CHOKED)
-                      chokeCount++;
-              }
+        TimerTask optUnchokeTask = new TimerTask() {
+            public void run() {
+                int chokeCount = 0;
+                for (ConnectionHandler connection : connectionHandlerList) {
+                    if (connection.getRemoteStatus() == ChokeStatus.CHOKED)
+                        chokeCount++;
+                }
 
-              Random rand = new Random();
-              int randValue = rand.nextInt(chokeCount);
+                if (chokeCount == 0) {
+                    return;
+                }
 
-              for(ConnectionHandler connection : connectionHandlerList) {
-                  if(connection.getPeerStatus() == ChokeStatus.CHOKED && randValue-- == 0) {
-                      Message choke = new Message(MessageType.UNCHOKE);
-                      connection.addMessage(choke);
-                  }
-              }
-          }
+                Random rand = new Random();
+                int randValue = rand.nextInt(chokeCount);
+
+                for (ConnectionHandler connection : connectionHandlerList) {
+                    if (connection.getRemoteStatus() == ChokeStatus.CHOKED && randValue-- == 0) {
+                        Message choke = new Message(MessageType.UNCHOKE);
+                        connection.addMessage(choke);
+                        Logger.getInstance().optUnchokedNeighborChanged(connection.getRemotePeerId());
+                        break;
+                    }
+                }
+            }
         };
         Timer optUnchokeTimer = new Timer("OptimisticallyUnchokeAlgorithm");
         optUnchokeTimer.scheduleAtFixedRate(optUnchokeTask, 0, Config.getInstance().getOptimisticUnchokingInterval() * 1000);
-        
+
     }
 }
