@@ -15,13 +15,13 @@ import java.util.Random;
 
 public class Tracker {
     private volatile static Tracker instance;
+    private static List<ConnectionHandler> connectionHandlerList;
     private int numPieces;
     private BitSet bitField;
     private BitSet reqBitField;
     private Hashtable<Integer, BitSet> peerBitField;
     private Path filePath;
     private FileChannel fileChannel;
-    private static List<ConnectionHandler> connectionHandlerList;
 
     private Tracker() {
         numPieces = (Config.getInstance().getFileSize() - 1) / Config.getInstance().getPieceSize() + 1;
@@ -65,12 +65,12 @@ public class Tracker {
         return output;
     }
 
-    void setConnectionHandlerList(List<ConnectionHandler> connectionHandlerList){
-        this.connectionHandlerList = connectionHandlerList;
+    List<ConnectionHandler> getConnectionHandlerList() {
+        return connectionHandlerList;
     }
 
-    List<ConnectionHandler> getConnectionHandlerList(){
-        return connectionHandlerList;
+    void setConnectionHandlerList(List<ConnectionHandler> connectionHandlerList) {
+        Tracker.connectionHandlerList = connectionHandlerList;
     }
 
     void setBit(int pieceIndex) {
@@ -81,33 +81,33 @@ public class Tracker {
         bitField.set(0, numPieces, true);
     }
 
-    void setPieceRequested(int pieceIndex) {
-        reqBitField.set(pieceIndex);
-    }
-
-    void unsetPieceRequested(int pieceIndex) {
-        reqBitField.clear(pieceIndex);
-    }
-
     void setPeerBitField(int peerId, byte[] peerField) {
         peerBitField.put(peerId, BitSet.valueOf(peerField));
     }
 
-    int getNewRandomPieceNumber(int peerId) {
+    int getNewRandomPieceNumber(int peerId, boolean setRequested) {
         if (!peerBitField.containsKey(peerId)) {
             return -1;
         }
 
         BitSet diff = (BitSet) peerBitField.get(peerId).clone();
         diff.andNot(bitField);
-        diff.andNot(reqBitField);
-        int diffCard = diff.cardinality();
-        if (diffCard == 0) {
-            return -1;
-        }
 
-        int nextRand = new Random().nextInt(diffCard);
-        return diff.stream().skip(nextRand).iterator().nextInt();
+        synchronized (this) {
+            diff.andNot(reqBitField);
+            int diffCard = diff.cardinality();
+            if (diffCard == 0) {
+                return -1;
+            }
+            int nextRand = new Random().nextInt(diffCard);
+            int index = diff.stream().skip(nextRand).iterator().nextInt();
+
+            if (setRequested) {
+                reqBitField.set(index);
+            }
+
+            return index;
+        }
     }
 
     void setPeerHasPiece(int peerId, int pieceIndex) {

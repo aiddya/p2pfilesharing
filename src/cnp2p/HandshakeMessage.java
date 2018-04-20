@@ -23,23 +23,6 @@ public class HandshakeMessage implements Externalizable {
         System.arraycopy(ByteBuffer.allocate(4).putInt(peerId).array(), 0, bytes, 28, 4);
     }
 
-    private HandshakeMessage(byte[] fromBytes) {
-        bytes = fromBytes;
-    }
-
-    static HandshakeMessage parse(byte[] fromBytes) {
-        if (fromBytes.length != 32) {
-            return null;
-        }
-
-        HandshakeMessage obj = new HandshakeMessage(fromBytes);
-        if (obj.validate()) {
-            return obj;
-        } else {
-            return null;
-        }
-    }
-
     public void writeExternal(ObjectOutput out) throws IOException {
         out.write(bytes);
         out.flush();
@@ -52,23 +35,6 @@ public class HandshakeMessage implements Externalizable {
                 throw new ClassNotFoundException("Invalid handshake message prefix!");
             }
         }
-    }
-
-    boolean validate() {
-        if (bytes == null) {
-            return false;
-        }
-
-        for (int i = 0; i < bytePrefix.length; i++) {
-            if (bytes[i] != bytePrefix[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    byte[] getBytes() {
-        return bytes;
     }
 
     int getPeerId() {

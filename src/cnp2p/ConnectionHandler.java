@@ -10,47 +10,17 @@ import static cnp2p.ChokeStatus.CHOKED;
 import static cnp2p.ChokeStatus.UNCHOKED;
 
 public class ConnectionHandler extends Thread {
-    public static final int QUEUE_CAPACITY = 50;
+    private static final int QUEUE_CAPACITY = 50;
 
-    private final int BUFFER_SIZE = 32;
+    private final BlockingQueue<Message> messageQueue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
     private Socket connection;
     private int localPeerId;
     private int remotePeerId;
     private boolean incomingConnection;
     private boolean remoteInterested;
-    private boolean interested;
-    private ChokeStatus myStatus;
-    private ChokeStatus peerStatus;
+    private ChokeStatus localStatus;
+    private ChokeStatus remoteStatus;
     private double downloadRate = 0;
-    private final BlockingQueue<Message> messageQueue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
-
-    public boolean isRemoteInterested() {
-        return remoteInterested;
-    }
-
-    public boolean isInterested() {
-        return interested;
-    }
-
-    ChokeStatus getMyStatus() {
-        return myStatus;
-    }
-
-    void setMyStatus(ChokeStatus myStatus) {
-        this.myStatus = myStatus;
-    }
-
-    ChokeStatus getPeerStatus() {
-        return peerStatus;
-    }
-
-    void setPeerStatus(ChokeStatus peerStatus) {
-        this.peerStatus = peerStatus;
-    }
-
-    double getDownloadRate() {
-        return downloadRate;
-    }
 
     ConnectionHandler(Socket connection, int localPeerId) {
         this.connection = connection;
@@ -65,28 +35,42 @@ public class ConnectionHandler extends Thread {
         incomingConnection = false;
     }
 
-    void addMessage(Message msg){
+    public int getRemotePeerId() {
+        return remotePeerId;
+    }
+
+    boolean isRemoteInterested() {
+        return remoteInterested;
+    }
+
+    ChokeStatus getRemoteStatus() {
+        return remoteStatus;
+    }
+
+    double getDownloadRate() {
+        return downloadRate;
+    }
+
+    void addMessage(Message msg) {
         try {
             messageQueue.put(msg);
-        }catch(InterruptedException ie){
+        } catch (InterruptedException ie) {
 
         }
     }
 
     public void run() {
-        byte[] buf = new byte[BUFFER_SIZE];
         try {
             ObjectOutputStream outputStream = new ObjectOutputStream(connection.getOutputStream());
             ObjectInputStream inputStream = new ObjectInputStream(connection.getInputStream());
             outputStream.flush();
 
             if (incomingConnection) {
-                inputStream.read(buf);
-                HandshakeMessage ihs = HandshakeMessage.parse(buf);
+                HandshakeMessage ihs = (HandshakeMessage) inputStream.readObject();
                 if (ihs != null) {
                     remotePeerId = ihs.getPeerId();
                     HandshakeMessage ohs = new HandshakeMessage(localPeerId);
-                    outputStream.write(ohs.getBytes());
+                    outputStream.writeObject(ohs);
                     outputStream.flush();
                 } else {
                     System.out.println("Malformed handshake message");
@@ -108,7 +92,7 @@ public class ConnectionHandler extends Thread {
                     Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
                 }
                 Message oint;
-                if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId) != -1) {
+                if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
                     oint = new Message(MessageType.INTERESTED);
                 } else {
                     oint = new Message(MessageType.NOT_INTERESTED);
@@ -117,10 +101,9 @@ public class ConnectionHandler extends Thread {
                 outputStream.flush();
             } else {
                 HandshakeMessage ohs = new HandshakeMessage(localPeerId);
-                outputStream.write(ohs.getBytes());
+                outputStream.writeObject(ohs);
                 outputStream.flush();
-                inputStream.readFully(buf);
-                HandshakeMessage ihs = HandshakeMessage.parse(buf);
+                HandshakeMessage ihs = (HandshakeMessage) inputStream.readObject();
                 if (ihs == null || ihs.getPeerId() != remotePeerId) {
                     System.out.println("Malformed handshake message");
                     return;
@@ -134,7 +117,7 @@ public class ConnectionHandler extends Thread {
                 Tracker.getInstance().setPeerBitField(remotePeerId, incomingBitField.getPayload());
 
                 Message oint;
-                if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId) != -1) {
+                if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
                     oint = new Message(MessageType.INTERESTED);
                 } else {
                     oint = new Message(MessageType.NOT_INTERESTED);
@@ -158,14 +141,13 @@ public class ConnectionHandler extends Thread {
                         switch (msg.getType()) {
                             case CHOKE:
                                 Logger.getInstance().chokedBy(remotePeerId);
-                                myStatus = CHOKED;
+                                localStatus = CHOKED;
                                 break;
                             case UNCHOKE:
                                 Logger.getInstance().unchokedBy(remotePeerId);
-                                myStatus = ChokeStatus.UNCHOKED;
-                                pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId);
-                                if(pieceIndex != -1) {
-                                    Tracker.getInstance().setPieceRequested(pieceIndex);
+                                localStatus = ChokeStatus.UNCHOKED;
+                                pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
+                                if (pieceIndex != -1) {
                                     newMessage = new Message(MessageType.REQUEST, pieceIndex);
                                     messageQueue.put(newMessage);
                                 }
@@ -173,7 +155,7 @@ public class ConnectionHandler extends Thread {
                             case HAVE:
                                 Logger.getInstance().receivedHaveFrom(remotePeerId, msg.getIndex());
                                 Tracker.getInstance().setPeerHasPiece(remotePeerId, msg.getIndex());
-                                if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId) != -1) {
+                                if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
                                     newMessage = new Message(MessageType.INTERESTED);
                                 } else {
                                     newMessage = new Message(MessageType.NOT_INTERESTED);
@@ -182,7 +164,7 @@ public class ConnectionHandler extends Thread {
                                 break;
                             case BITFIELD:
                                 Tracker.getInstance().setPeerBitField(remotePeerId, msg.getPayload());
-                                if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId) != -1) {
+                                if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
                                     newMessage = new Message(MessageType.INTERESTED);
                                 } else {
                                     newMessage = new Message(MessageType.NOT_INTERESTED);
@@ -198,7 +180,7 @@ public class ConnectionHandler extends Thread {
                                 remoteInterested = false;
                                 break;
                             case REQUEST:
-                                if(myStatus == UNCHOKED) {
+                                if (localStatus == UNCHOKED) {
                                     newMessage = new Message(MessageType.PIECE, Tracker.getInstance().getPiece(msg.getIndex()));
                                     messageQueue.put(newMessage);
                                 }
@@ -206,22 +188,21 @@ public class ConnectionHandler extends Thread {
                             case PIECE:
                                 Tracker.getInstance().putPiece(msg.getIndex(), msg.getPayload());
                                 Tracker.getInstance().setBit(msg.getIndex());
-                                for(ConnectionHandler connection : Tracker.getInstance().getConnectionHandlerList()){
+                                for (ConnectionHandler connection : Tracker.getInstance().getConnectionHandlerList()) {
                                     connection.addMessage(new Message(MessageType.HAVE, msg.getIndex()));
                                 }
                                 downloadRate++;
                                 Logger.getInstance().downloadedPieceFrom(remotePeerId, msg.getIndex(), Tracker.getInstance().getNumberPieces());
-                                if(myStatus == UNCHOKED){
-                                    pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId);
-                                    if(pieceIndex != -1) {
-                                        Tracker.getInstance().setPieceRequested(pieceIndex);
+                                if (localStatus == UNCHOKED) {
+                                    pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
+                                    if (pieceIndex != -1) {
                                         newMessage = new Message(MessageType.REQUEST, pieceIndex);
                                         messageQueue.put(newMessage);
                                     }
                                 }
                                 break;
                         }
-                    }catch(Exception ex){
+                    } catch (Exception ex) {
 
                     }
                 }
@@ -230,23 +211,21 @@ public class ConnectionHandler extends Thread {
             receiverThread.start();
 
             Message message;
-            while(true){
+            while (true) {
                 message = messageQueue.take();
-                switch(message.getType()){
+                switch (message.getType()) {
                     case CHOKE:
-                        setPeerStatus(CHOKED);
+                        remoteStatus = CHOKED;
                         outputStream.writeObject(message);
                         break;
                     case UNCHOKE:
-                        setPeerStatus(UNCHOKED);
+                        remoteStatus = UNCHOKED;
                         outputStream.writeObject(message);
                         break;
                     case INTERESTED:
-                        interested = true;
                         outputStream.writeObject(message);
                         break;
                     case NOT_INTERESTED:
-                        interested = false;
                         outputStream.writeObject(message);
                         break;
                     case HAVE:
@@ -257,8 +236,6 @@ public class ConnectionHandler extends Thread {
                         break;
                 }
             }
-
-
         } catch (Exception e) {
             System.out.println("Encountered an error while communicating with a peer");
             e.printStackTrace();
