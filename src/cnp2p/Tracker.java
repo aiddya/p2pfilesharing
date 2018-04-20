@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.BitSet;
 import java.util.Hashtable;
@@ -24,16 +26,7 @@ class Tracker {
         bitField = new BitSet(numPieces);
         reqBitField = new BitSet(numPieces);
         peerBitField = new Hashtable<>();
-        String filePath = Paths.get(Config.getInstance().getCurrentDirectory(), Config.getInstance().getFileName()).toString();
-        try {
-            if (Config.getInstance().getHasFile()) {
-                file = new RandomAccessFile(filePath, "r");
-            } else {
-                file = new RandomAccessFile(filePath, "rws");
-            }
-        } catch (IOException io) {
-            System.out.println("Unable to open " + Config.getInstance().getFileName() + " file!");
-        }
+
     }
 
     static Tracker getInstance() {
@@ -45,6 +38,24 @@ class Tracker {
             }
         }
         return instance;
+    }
+
+    void instantiateFile(int peerId, boolean hasFile) {
+        Path dirPath = Paths.get(Config.getInstance().getCurrentDirectory(),
+                "peer_" + peerId);
+        String filePath = Paths.get(Config.getInstance().getCurrentDirectory(),
+                "peer_" + peerId,
+                Config.getInstance().getFileName()).toString();
+        try {
+            if (hasFile) {
+                file = new RandomAccessFile(filePath, "r");
+            } else {
+                Files.createDirectories(dirPath);
+                file = new RandomAccessFile(filePath, "rws");
+            }
+        } catch (IOException io) {
+            System.out.println("Unable to open " + Config.getInstance().getFileName() + " file!");
+        }
     }
 
     int getNumberPieces() {
@@ -114,7 +125,12 @@ class Tracker {
     }
 
     byte[] getPiece(int pieceIndex) {
-        ByteBuffer byteBuffer = ByteBuffer.allocate(Config.getInstance().getPieceSize());
+        int size = Config.getInstance().getPieceSize();
+        if (pieceIndex == numPieces - 1) {
+            // Last piece
+            size = Config.getInstance().getFileSize() % Config.getInstance().getPieceSize();
+        }
+        ByteBuffer byteBuffer = ByteBuffer.allocate(size);
 
         synchronized (this) {
             FileChannel fileChannel = file.getChannel();
@@ -137,7 +153,7 @@ class Tracker {
     }
 
     void putPiece(int pieceIndex, byte[] piece) {
-        ByteBuffer byteBuffer = ByteBuffer.allocate(Config.getInstance().getPieceSize());
+        ByteBuffer byteBuffer = ByteBuffer.allocate(piece.length);
         byteBuffer.put(piece);
         byteBuffer.flip();
 

@@ -5,7 +5,6 @@ public enum ChokeStatus {
     CHOKED(1),
     UNCHOKED(2);
 
-
     private int value;
 
     ChokeStatus(int val) {

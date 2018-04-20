@@ -42,20 +42,20 @@ public class Main {
 
         List<Peer> peerListTrim = new ArrayList<>();
         connectionHandlerList = new CopyOnWriteArrayList<>();
+        Tracker.getInstance().setConnectionHandlerList(connectionHandlerList);
 
-        for (indexPeers = 0; indexPeers < peerListComplete.size() &&
-                peerListComplete.get(indexPeers).getPeerId() != peerId; indexPeers++) {
+        for (indexPeers = 0; indexPeers < peerListComplete.size()
+                && peerListComplete.get(indexPeers).getPeerId() != peerId; indexPeers++) {
             peerListTrim.add(peerListComplete.get(indexPeers));
         }
 
         listeningPortNumber = peerListComplete.get(indexPeers).getPortNumber();
         if (peerListComplete.get(indexPeers).hasFile()) {
-            Config.getInstance().setHasFile(true);
             Tracker.getInstance().setAllBits();
+            Tracker.getInstance().instantiateFile(peerListComplete.get(indexPeers).getPeerId(), true);
+        } else {
+            Tracker.getInstance().instantiateFile(peerListComplete.get(indexPeers).getPeerId(), false);
         }
-
-        // This MUST be called after setHasFile
-        Tracker.getInstance().setConnectionHandlerList(connectionHandlerList);
 
         Thread listeningThread = new Thread(() -> {
             try {
@@ -75,10 +75,9 @@ public class Main {
 
         for (Peer peer : peerListTrim) {
             try {
-                Socket connectPeerSocket = new Socket(peer.getHostName(),
-                        peer.getPortNumber());
-                ConnectionHandler connectionHandler =
-                        new ConnectionHandler(connectPeerSocket, peerId, peer.getPeerId());
+                Socket connectPeerSocket = new Socket(peer.getHostName(), peer.getPortNumber());
+                ConnectionHandler connectionHandler = new ConnectionHandler(connectPeerSocket, peerId,
+                        peer.getPeerId());
                 connectionHandlerList.add(connectionHandler);
                 connectionHandler.start();
             } catch (Exception e) {
@@ -89,7 +88,8 @@ public class Main {
         TimerTask unchokeTask = new TimerTask() {
             public void run() {
                 ArrayList<ConnectionHandler> currentList = new ArrayList<>(connectionHandlerList);
-                currentList.sort(Collections.reverseOrder(Comparator.comparingDouble(ConnectionHandler::getDownloadRate)));
+                currentList
+                        .sort(Collections.reverseOrder(Comparator.comparingDouble(ConnectionHandler::getDownloadRate)));
                 int connectionsCount = currentList.size();
                 int prefCount = Config.getInstance().getPreferredNeighbors();
                 boolean neighboursChanged = false;
@@ -156,6 +156,7 @@ public class Main {
         };
 
         Timer optUnchokeTimer = new Timer("OptimisticallyUnchokeAlgorithm");
-        optUnchokeTimer.scheduleAtFixedRate(optUnchokeTask, 0, Config.getInstance().getOptimisticUnchokingInterval() * 1000);
+        optUnchokeTimer.scheduleAtFixedRate(optUnchokeTask, 0,
+                Config.getInstance().getOptimisticUnchokingInterval() * 1000);
     }
 }

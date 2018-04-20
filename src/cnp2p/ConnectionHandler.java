@@ -20,6 +20,7 @@ public class ConnectionHandler extends Thread {
     private int remotePeerId;
     private boolean incomingConnection;
     private boolean remoteInterested;
+    private boolean localInterested;
     private ChokeStatus localStatus;
     private ChokeStatus remoteStatus;
     private double downloadRate = 0;
@@ -65,6 +66,19 @@ public class ConnectionHandler extends Thread {
         }
     }
 
+    Message updateInterestedStatus() {
+        if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
+            if (!localInterested) {
+                localInterested = true;
+                return new Message(INTERESTED);
+            }
+        } else if (localInterested) {
+            localInterested = false;
+            return new Message(NOT_INTERESTED);
+        }
+        return null;
+    }
+
     public void run() {
         try {
             ObjectOutputStream outputStream = new ObjectOutputStream(connection.getOutputStream());
@@ -101,8 +115,10 @@ public class ConnectionHandler extends Thread {
                 }
                 Message oint;
                 if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
+                    localInterested = true;
                     oint = new Message(INTERESTED);
                 } else {
+                    localInterested = false;
                     oint = new Message(NOT_INTERESTED);
                 }
                 outputStream.writeObject(oint);
@@ -126,8 +142,10 @@ public class ConnectionHandler extends Thread {
 
                 Message oint;
                 if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
+                    localInterested = true;
                     oint = new Message(INTERESTED);
                 } else {
+                    localInterested = false;
                     oint = new Message(NOT_INTERESTED);
                 }
                 outputStream.writeObject(oint);
@@ -177,21 +195,17 @@ public class ConnectionHandler extends Thread {
                     case HAVE:
                         Logger.getInstance().receivedHaveFrom(remotePeerId, msg.getIndex());
                         Tracker.getInstance().setPeerHasPiece(remotePeerId, msg.getIndex());
-                        if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
-                            newMessage = new Message(INTERESTED);
-                        } else {
-                            newMessage = new Message(NOT_INTERESTED);
+                        newMessage = updateInterestedStatus();
+                        if (newMessage != null) {
+                            addMessage(newMessage);
                         }
-                        addMessage(newMessage);
                         break;
                     case BITFIELD:
                         Tracker.getInstance().setPeerBitField(remotePeerId, msg.getPayload());
-                        if (Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, false) != -1) {
-                            newMessage = new Message(INTERESTED);
-                        } else {
-                            newMessage = new Message(NOT_INTERESTED);
+                        newMessage = updateInterestedStatus();
+                        if (newMessage != null) {
+                            addMessage(newMessage);
                         }
-                        addMessage(newMessage);
                         break;
                     case INTERESTED:
                         remoteInterested = true;
