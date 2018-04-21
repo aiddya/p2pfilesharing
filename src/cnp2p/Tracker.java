@@ -25,7 +25,6 @@ class Tracker {
         bitField = new BitSet(numPieces);
         reqBitField = new BitSet(numPieces);
         peerBitField = new Hashtable<>();
-
     }
 
     static Tracker getInstance() {
@@ -40,11 +39,10 @@ class Tracker {
     }
 
     void instantiateFile(int peerId, boolean hasFile) {
-        Path dirPath = Paths.get(Config.getInstance().getCurrentDirectory(),
-                "peer_" + peerId);
-        String filePath = Paths.get(Config.getInstance().getCurrentDirectory(),
-                "peer_" + peerId,
-                Config.getInstance().getFileName()).toString();
+        Path dirPath = Paths.get(Config.getInstance().getCurrentDirectory(), "peer_" + peerId);
+        String filePath = Paths
+                .get(Config.getInstance().getCurrentDirectory(), "peer_" + peerId, Config.getInstance().getFileName())
+                .toString();
         try {
             if (hasFile) {
                 file = new RandomAccessFile(filePath, "r");
@@ -86,6 +84,10 @@ class Tracker {
 
     void setPeerBitField(int peerId, byte[] peerField) {
         peerBitField.put(peerId, BitSet.valueOf(peerField));
+    }
+
+    void unsetPieceRequested(int pieceIndex) {
+        reqBitField.clear(pieceIndex);
     }
 
     boolean isFileComplete() {

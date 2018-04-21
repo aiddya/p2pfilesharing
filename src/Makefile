@@ -2,7 +2,8 @@ JCC = javac
 JFLAGS = -g
 PKGDIR = cnp2p
 
-default: Config.class\
+default: ChokeStatus.class\
+	Config.class\
 	ConnectionHandler.class\
 	HandshakeMessage.class\
 	Logger.class\
@@ -12,6 +13,9 @@ default: Config.class\
 	Peer.class\
 	Tracker.class\
 	peerProcess.class
+
+ChokeStatus.class: $(PKGDIR)/ChokeStatus.java
+	$(JCC) $(JFLAGS) $(PKGDIR)/ChokeStatus.java
 
 Config.class: $(PKGDIR)/Config.java
 	$(JCC) $(JFLAGS) $(PKGDIR)/Config.java
