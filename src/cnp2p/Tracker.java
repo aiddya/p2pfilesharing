@@ -18,6 +18,7 @@ class Tracker {
     private BitSet bitField;
     private BitSet reqBitField;
     private Hashtable<Integer, BitSet> peerBitField;
+    private Hashtable<Integer, BitSet> peerReqBitField;
     private RandomAccessFile file;
 
     private Tracker() {
@@ -25,6 +26,7 @@ class Tracker {
         bitField = new BitSet(numPieces);
         reqBitField = new BitSet(numPieces);
         peerBitField = new Hashtable<>();
+        peerReqBitField = new Hashtable<>();
     }
 
     static Tracker getInstance() {
@@ -84,10 +86,16 @@ class Tracker {
 
     void setPeerBitField(int peerId, byte[] peerField) {
         peerBitField.put(peerId, BitSet.valueOf(peerField));
+        peerReqBitField.put(peerId, new BitSet(peerField.length));
     }
 
-    void unsetPieceRequested(int pieceIndex) {
+    void unsetPieceRequested(int pieceIndex, int peerId) {
         reqBitField.clear(pieceIndex);
+        peerReqBitField.get(peerId).clear(pieceIndex);
+    }
+
+    void clearReqBitField(int peerId) {
+        reqBitField.andNot(peerReqBitField.get(peerId));
     }
 
     boolean isFileComplete() {
@@ -117,6 +125,7 @@ class Tracker {
 
             if (setRequested) {
                 reqBitField.set(index);
+                peerReqBitField.get(peerId).set(index);
             }
 
             return index;

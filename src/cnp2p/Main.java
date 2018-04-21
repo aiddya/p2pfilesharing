@@ -30,6 +30,7 @@ public class Main {
 
         try {
             Logger.createInstance(peerId, Config.getInstance().getCurrentDirectory());
+            Logger.getInstance().start();
         } catch (Exception e) {
             e.printStackTrace();
             System.out.println("Unable to read configuration. Exiting!");
@@ -84,7 +85,8 @@ public class Main {
                 connectionHandlerList.add(connectionHandler);
                 connectionHandler.start();
             } catch (Exception e) {
-                System.out.println(peerId + " Failed to initiate connection with " + peer.getHostName() + " with peer ID " + peer.getPeerId());
+                System.out.println(peerId + " Failed to initiate connection with " + peer.getHostName()
+                        + " with peer ID " + peer.getPeerId());
             }
         }
 
@@ -92,8 +94,7 @@ public class Main {
             public void run() {
                 ArrayList<ConnectionHandler> currentList = new ArrayList<>(connectionHandlerList);
                 Collections.shuffle(currentList);
-                currentList
-                        .sort(Collections.reverseOrder(Comparator.comparingInt(ConnectionHandler::getDownloadRate)));
+                currentList.sort(Collections.reverseOrder(Comparator.comparingInt(ConnectionHandler::getDownloadRate)));
                 int connectionsCount = currentList.size();
                 int prefCount = Config.getInstance().getPreferredNeighbors();
                 boolean neighboursChanged = false;

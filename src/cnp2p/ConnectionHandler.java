@@ -24,7 +24,6 @@ public class ConnectionHandler extends Thread {
     private ChokeStatus localStatus;
     private ChokeStatus remoteStatus;
     private int downloadRate;
-    private int lastRequestedPiece;
 
     ConnectionHandler(Socket connection, int localPeerId) {
         this.connection = connection;
@@ -33,7 +32,6 @@ public class ConnectionHandler extends Thread {
         localStatus = UNKNOWN;
         remoteStatus = UNKNOWN;
         downloadRate = 0;
-        lastRequestedPiece = -1;
     }
 
     ConnectionHandler(Socket connection, int localPeerId, int remotePeerId) {
@@ -44,7 +42,6 @@ public class ConnectionHandler extends Thread {
         localStatus = UNKNOWN;
         remoteStatus = UNKNOWN;
         downloadRate = 0;
-        lastRequestedPiece = -1;
     }
 
     int getRemotePeerId() {
@@ -186,16 +183,13 @@ public class ConnectionHandler extends Thread {
                         case CHOKE:
                             Logger.getInstance().chokedBy(remotePeerId);
                             localStatus = CHOKED;
-                            if (lastRequestedPiece != -1) {
-                                Tracker.getInstance().unsetPieceRequested(lastRequestedPiece);
-                            }
+                            Tracker.getInstance().clearReqBitField(remotePeerId);
                             break;
                         case UNCHOKE:
                             Logger.getInstance().unchokedBy(remotePeerId);
                             localStatus = UNCHOKED;
                             pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
                             if (pieceIndex != -1) {
-                                lastRequestedPiece = pieceIndex;
                                 newMessage = new Message(REQUEST, pieceIndex);
                                 addMessage(newMessage);
                             }
@@ -233,6 +227,7 @@ public class ConnectionHandler extends Thread {
                         case PIECE:
                             Tracker.getInstance().putPiece(msg.getIndex(), msg.getPayload());
                             Tracker.getInstance().setBit(msg.getIndex());
+                            Tracker.getInstance().unsetPieceRequested(msg.getIndex(), remotePeerId);
                             Logger.getInstance().downloadedPieceFrom(remotePeerId, msg.getIndex(),
                                     Tracker.getInstance().getNumberPieces());
                             if (Tracker.getInstance().isFileComplete()) {
@@ -240,7 +235,6 @@ public class ConnectionHandler extends Thread {
                             } else if (localStatus == UNCHOKED) {
                                 pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
                                 if (pieceIndex != -1) {
-                                    lastRequestedPiece = pieceIndex;
                                     newMessage = new Message(REQUEST, pieceIndex);
                                     addMessage(newMessage);
                                 }
