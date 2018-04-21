@@ -81,7 +81,7 @@ public class Main {
                 connectionHandlerList.add(connectionHandler);
                 connectionHandler.start();
             } catch (Exception e) {
-                System.out.println("Failed to initiate connection with " + peer.getHostName());
+                System.out.println(peerId + " Failed to initiate connection with " + peer.getHostName() + " with peer ID " + peer.getPeerId());
             }
         }
 
