@@ -88,6 +88,7 @@ public class Main {
         TimerTask unchokeTask = new TimerTask() {
             public void run() {
                 ArrayList<ConnectionHandler> currentList = new ArrayList<>(connectionHandlerList);
+                Collections.shuffle(currentList);
                 currentList
                         .sort(Collections.reverseOrder(Comparator.comparingInt(ConnectionHandler::getDownloadRate)));
                 int connectionsCount = currentList.size();

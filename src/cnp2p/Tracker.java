@@ -1,11 +1,8 @@
 package cnp2p;
 
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -130,30 +127,23 @@ class Tracker {
         int size = Config.getInstance().getPieceSize();
         if (pieceIndex == numPieces - 1) {
             // Last piece
-            size = Config.getInstance().getFileSize() % Config.getInstance().getPieceSize();
+            int leftover = Config.getInstance().getFileSize() % Config.getInstance().getPieceSize();
+            if (leftover != 0) {
+                size = leftover;
+            }
         }
-        //ByteBuffer byteBuffer = ByteBuffer.allocate(size);
         byte[] bytes = new byte[size];
 
         synchronized (this) {
-            //FileChannel fileChannel = file.getChannel();
-
             try {
-                //fileChannel.position(pieceIndex * Config.getInstance().getPieceSize());
                 file.seek(pieceIndex * Config.getInstance().getPieceSize());
-                file.read(bytes);
-                /*while (byteBuffer.hasRemaining()) {
-                    if (fileChannel.read(byteBuffer) == -1) {
-                        break;
-                    }
-                }*/
+                file.readFully(bytes);
             } catch (IOException io) {
                 System.out.println("Error getting piece at index " + pieceIndex);
                 io.printStackTrace();
                 return null;
             }
         }
-        //byteBuffer.flip();
         return bytes;
     }
 
@@ -163,15 +153,9 @@ class Tracker {
         byteBuffer.flip();
 
         synchronized (this) {
-            //FileChannel fileChannel = file.getChannel();
-
             try {
                 file.seek(pieceIndex * Config.getInstance().getPieceSize());
                 file.write(piece);
-                //fileChannel.position(pieceIndex * Config.getInstance().getPieceSize());
-                /*while (byteBuffer.hasRemaining()) {
-                    fileChannel.write(byteBuffer);
-                }*/
             } catch (IOException io) {
                 System.out.println("Error writing piece to index " + pieceIndex);
                 io.printStackTrace();

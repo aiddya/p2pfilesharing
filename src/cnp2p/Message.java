@@ -9,7 +9,6 @@ import java.nio.ByteBuffer;
 import static cnp2p.MessageType.*;
 
 public class Message implements Externalizable {
-    private static final int BUFFER_SIZE = 8192;
     int pieceIndex;
     private MessageType messageType;
     private byte[] payload;
@@ -96,9 +95,7 @@ public class Message implements Externalizable {
         messageType = fromInt(in.read());
         if (messageType == null) {
             throw new ClassNotFoundException("Invalid message type specified");
-        } else if ((messageType == CHOKE
-                || messageType == UNCHOKE
-                || messageType == INTERESTED
+        } else if ((messageType == CHOKE || messageType == UNCHOKE || messageType == INTERESTED
                 || messageType == NOT_INTERESTED) && length != 1) {
             throw new ClassNotFoundException("Invalid message length, expected 1 got " + length);
         } else if ((messageType == HAVE || messageType == REQUEST) && length != 5) {
@@ -116,10 +113,7 @@ public class Message implements Externalizable {
 
             if (messageType == BITFIELD || messageType == PIECE) {
                 payload = new byte[length - (messageType == BITFIELD ? 1 : 5)];
-                for (int i = 0; i <= payload.length / BUFFER_SIZE; i++) {
-                    int remaining = payload.length - (i * BUFFER_SIZE);
-                    in.read(payload, i * BUFFER_SIZE, remaining < BUFFER_SIZE ? remaining : BUFFER_SIZE);
-                }
+                in.readFully(payload);
             }
         }
     }
