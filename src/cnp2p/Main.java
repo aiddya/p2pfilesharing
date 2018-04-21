@@ -6,6 +6,8 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import static cnp2p.ChokeStatus.*;
+
 public class Main {
     private static List<ConnectionHandler> connectionHandlerList;
 
@@ -29,6 +31,7 @@ public class Main {
         try {
             Logger.createInstance(peerId, Config.getInstance().getCurrentDirectory());
         } catch (Exception e) {
+            e.printStackTrace();
             System.out.println("Unable to read configuration. Exiting!");
             return;
         }
@@ -106,20 +109,22 @@ public class Main {
 
                 for (ConnectionHandler connection : currentList) {
                     if (connection.isRemoteInterested() && prefCount != 0) {
-                        if (connection.getRemoteStatus() != ChokeStatus.UNCHOKED) {
+                        if (connection.getRemoteStatus() != UNCHOKED) {
                             neighboursChanged = true;
                             Message unchoke = new Message(MessageType.UNCHOKE);
                             connection.addMessage(unchoke);
+                            connection.setRemoteStatus(UNCHOKED);
                         }
                         peerIds[--prefCount] = connection.getRemotePeerId();
-                    } else if (connection.getRemoteStatus() != ChokeStatus.CHOKED && prefCount == 0) {
-                        if (connection.getRemoteStatus() != ChokeStatus.UNKNOWN) {
+                    } else if (connection.getRemoteStatus() != CHOKED && prefCount == 0) {
+                        if (connection.getRemoteStatus() != UNKNOWN) {
                             neighboursChanged = true;
                         }
                         Message choke = new Message(MessageType.CHOKE);
                         connection.addMessage(choke);
+                        connection.setRemoteStatus(CHOKED);
                     }
-                    connection.setDownloadRate(0);
+                    connection.resetDownloadRate();
                 }
 
                 if (neighboursChanged) {
@@ -135,7 +140,7 @@ public class Main {
             public void run() {
                 ArrayList<ConnectionHandler> chokedConnections = new ArrayList<>();
                 for (ConnectionHandler connection : connectionHandlerList) {
-                    if (connection.getRemoteStatus() != ChokeStatus.UNCHOKED && connection.isRemoteInterested()) {
+                    if (connection.getRemoteStatus() != UNCHOKED && connection.isRemoteInterested()) {
                         chokedConnections.add(connection);
                     }
                 }
@@ -149,9 +154,10 @@ public class Main {
 
                 ConnectionHandler connection = chokedConnections.get(randValue);
 
-                if (connection.getRemoteStatus() != ChokeStatus.UNCHOKED) {
+                if (connection.getRemoteStatus() != UNCHOKED) {
                     Message unchoke = new Message(MessageType.UNCHOKE);
                     connection.addMessage(unchoke);
+                    connection.setRemoteStatus(UNCHOKED);
                     Logger.getInstance().optUnchokedNeighborChanged(connection.getRemotePeerId());
                 }
             }

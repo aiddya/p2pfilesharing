@@ -94,6 +94,10 @@ class Tracker {
         return bitField.cardinality() == numPieces;
     }
 
+    boolean isFileComplete(int peerId) {
+        return peerBitField.get(peerId).cardinality() == numPieces;
+    }
+
     int getNewRandomPieceNumber(int peerId, boolean setRequested) {
         if (!peerBitField.containsKey(peerId)) {
             return -1;

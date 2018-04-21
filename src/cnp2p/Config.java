@@ -4,7 +4,7 @@ import java.io.*;
 import java.net.URL;
 import java.util.*;
 
-public class Config {
+class Config {
     private volatile static Config instance;
     private int preferredNeighbors;
     private int unchokingInterval;
@@ -18,10 +18,10 @@ public class Config {
     private Config() {
         Properties commonProp = new Properties();
         try {
-            String commonConfig = "Config.cfg";
+            String commonConfig = "Common.cfg";
             ClassLoader classLoader = Main.class.getClassLoader();
             URL res = Objects.requireNonNull(classLoader.getResource(commonConfig),
-                    "Can't find configuration file Config.cfg");
+                    "Can't find configuration file Common.cfg");
             InputStream is = new FileInputStream(res.getFile());
             currentDirectory = System.getProperty("user.dir");
             commonProp.load(is);
@@ -38,7 +38,7 @@ public class Config {
         readPeerInfo();
     }
 
-    public static Config getInstance() {
+    static Config getInstance() {
         if (instance == null) {
             synchronized (Config.class) {
                 if (instance == null) {
@@ -49,7 +49,7 @@ public class Config {
         return instance;
     }
 
-    public String getCurrentDirectory() {
+    String getCurrentDirectory() {
         return currentDirectory;
     }
 
@@ -72,31 +72,31 @@ public class Config {
         }
     }
 
-    public int getPreferredNeighbors() {
+    int getPreferredNeighbors() {
         return preferredNeighbors;
     }
 
-    public int getUnchokingInterval() {
+    int getUnchokingInterval() {
         return unchokingInterval;
     }
 
-    public int getOptimisticUnchokingInterval() {
+    int getOptimisticUnchokingInterval() {
         return optimisticUnchokingInterval;
     }
 
-    public String getFileName() {
+    String getFileName() {
         return fileName;
     }
 
-    public int getFileSize() {
+    int getFileSize() {
         return fileSize;
     }
 
-    public int getPieceSize() {
+    int getPieceSize() {
         return pieceSize;
     }
 
-    public List<Peer> getPeerList() {
+    List<Peer> getPeerList() {
         return peerList;
     }
 }
