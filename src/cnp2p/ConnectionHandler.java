@@ -299,7 +299,7 @@ public class ConnectionHandler extends Thread {
             } catch (IOException ex) {
                 // Connection already closed, simply return
             }
-        } catch (Exception e) {
+        } catch (IOException | ClassNotFoundException e) {
             System.out.println("Encountered an error while communicating with a peer");
             e.printStackTrace();
         }
