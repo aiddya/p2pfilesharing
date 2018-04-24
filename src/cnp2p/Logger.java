@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 class Logger extends Thread {
     private static final int QUEUE_CAPACITY = 500;
@@ -121,13 +122,25 @@ class Logger extends Thread {
 
     @Override
     public void run() {
-        while (true) {
+        while (!isInterrupted()) {
             try {
-                String msg = messageQueue.take();
+                String msg = messageQueue.poll(5, TimeUnit.SECONDS);
+                if (msg == null) {
+                    continue;
+                }
                 file.writeBytes(msg + System.lineSeparator());
-            } catch (InterruptedException | IOException ie) {
-                continue;
+            } catch (InterruptedException ie) {
+                // Interrupt called, program is done
+                break;
+            } catch (IOException ie) {
+                // Continue here
             }
+        }
+
+        try {
+            file.close();
+        } catch (IOException e) {
+            // Nothing to do here
         }
     }
 

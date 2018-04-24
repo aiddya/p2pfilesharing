@@ -57,6 +57,14 @@ class Tracker {
         }
     }
 
+    void closeFile() {
+        try {
+            file.close();
+        } catch (IOException e) {
+            // Nothing to do here
+        }
+    }
+
     int getNumberPieces() {
         return bitField.cardinality();
     }
@@ -103,7 +111,7 @@ class Tracker {
     }
 
     boolean isFileComplete(int peerId) {
-        return peerBitField.get(peerId).cardinality() == numPieces;
+        return (peerBitField.get(peerId).cardinality() == numPieces) && (bitField.cardinality() == numPieces);
     }
 
     int getNewRandomPieceNumber(int peerId, boolean setRequested) {
@@ -112,15 +120,13 @@ class Tracker {
         }
 
         BitSet diff = (BitSet) peerBitField.get(peerId).clone();
-        diff.andNot(bitField);
-
         synchronized (this) {
+            diff.andNot(bitField);
             diff.andNot(reqBitField);
-            int diffCard = diff.cardinality();
-            if (diffCard == 0) {
+            if (diff.isEmpty()) {
                 return -1;
             }
-            int nextRand = new Random().nextInt(diffCard);
+            int nextRand = new Random().nextInt(diff.cardinality());
             int index = diff.stream().skip(nextRand).iterator().nextInt();
 
             if (setRequested) {

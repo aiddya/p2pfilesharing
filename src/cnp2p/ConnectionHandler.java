@@ -1,12 +1,13 @@
 package cnp2p;
 
-import java.io.EOFException;
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import static cnp2p.ChokeStatus.*;
 import static cnp2p.MessageType.*;
@@ -21,24 +22,26 @@ public class ConnectionHandler extends Thread {
     private boolean incomingConnection;
     private boolean remoteInterested;
     private boolean localInterested;
+    private boolean fileTransferComplete;
     private ChokeStatus localStatus;
     private ChokeStatus remoteStatus;
     private int downloadRate;
 
     ConnectionHandler(Socket connection, int localPeerId) {
-        this.connection = connection;
-        this.localPeerId = localPeerId;
-        incomingConnection = true;
-        localStatus = UNKNOWN;
-        remoteStatus = UNKNOWN;
-        downloadRate = 0;
+        this(connection, localPeerId, -1);
     }
 
     ConnectionHandler(Socket connection, int localPeerId, int remotePeerId) {
         this.connection = connection;
         this.localPeerId = localPeerId;
-        this.remotePeerId = remotePeerId;
-        incomingConnection = false;
+        if (remotePeerId != -1) {
+            this.remotePeerId = remotePeerId;
+            incomingConnection = false;
+        } else {
+            incomingConnection = true;
+        }
+
+        fileTransferComplete = false;
         localStatus = UNKNOWN;
         remoteStatus = UNKNOWN;
         downloadRate = 0;
@@ -50,6 +53,10 @@ public class ConnectionHandler extends Thread {
 
     boolean isRemoteInterested() {
         return remoteInterested;
+    }
+
+    boolean isFileTransferComplete() {
+        return fileTransferComplete;
     }
 
     ChokeStatus getRemoteStatus() {
@@ -135,6 +142,11 @@ public class ConnectionHandler extends Thread {
                 outputStream.writeObject(outgoingBitField);
                 outputStream.flush();
 
+                if (Tracker.getInstance().isFileComplete(remotePeerId)) {
+                    fileTransferComplete = true;
+                    return;
+                }
+
                 Message iint = (Message) inputStream.readObject();
                 logInterested(iint.getType());
                 Message oint = sendInterestedStatus();
@@ -157,6 +169,11 @@ public class ConnectionHandler extends Thread {
                 Message incomingBitField = (Message) inputStream.readObject();
                 Tracker.getInstance().setPeerBitField(remotePeerId, incomingBitField.getPayload());
 
+                if (Tracker.getInstance().isFileComplete(remotePeerId)) {
+                    fileTransferComplete = true;
+                    return;
+                }
+
                 Message oint = sendInterestedStatus();
                 outputStream.writeObject(oint);
                 outputStream.flush();
@@ -164,107 +181,123 @@ public class ConnectionHandler extends Thread {
                 logInterested(iint.getType());
             }
 
-            Thread receiverThread = new Thread(() -> {
-                Message msg, newMessage;
-                int pieceIndex;
-                while (true) {
+            Thread senderThread = new Thread(() -> {
+                while (!fileTransferComplete) {
                     try {
-                        msg = (Message) inputStream.readObject();
-                    } catch (EOFException | SocketException e) {
-                        System.out.println("Connection ended");
-                        return;
-                    } catch (Exception e) {
-                        System.out.println("Encountered an error while receiving a message");
-                        e.printStackTrace();
-                        continue;
-                    }
+                        Message message = messageQueue.poll(2, TimeUnit.SECONDS);
 
-                    switch (msg.getType()) {
-                        case CHOKE:
-                            Logger.getInstance().chokedBy(remotePeerId);
-                            localStatus = CHOKED;
-                            Tracker.getInstance().clearReqBitField(remotePeerId);
-                            break;
-                        case UNCHOKE:
-                            Logger.getInstance().unchokedBy(remotePeerId);
-                            localStatus = UNCHOKED;
+                        if (message == null) {
+                            continue;
+                        }
+                        outputStream.writeObject(message);
+                        outputStream.flush();
+                    } catch (SocketException | InterruptedException e) {
+                        // Assuming file transfer complete
+                        fileTransferComplete = true;
+                        break;
+                    } catch (IOException e) {
+                        System.out.println("Encountered an error while sending a message");
+                        e.printStackTrace();
+                    }
+                }
+            }, "SenderThread");
+
+            senderThread.start();
+
+            Message msg, newMessage;
+            int pieceIndex;
+            while (!fileTransferComplete) {
+                try {
+                    msg = (Message) inputStream.readObject();
+                } catch (IOException e) {
+                    // Assuming file transfer complete
+                    fileTransferComplete = true;
+                    break;
+                }
+
+                switch (msg.getType()) {
+                    case CHOKE:
+                        Logger.getInstance().chokedBy(remotePeerId);
+                        localStatus = CHOKED;
+                        Tracker.getInstance().clearReqBitField(remotePeerId);
+                        break;
+                    case UNCHOKE:
+                        Logger.getInstance().unchokedBy(remotePeerId);
+                        localStatus = UNCHOKED;
+                        pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
+                        if (pieceIndex != -1) {
+                            newMessage = new Message(REQUEST, pieceIndex);
+                            addMessage(newMessage);
+                        }
+                        break;
+                    case HAVE:
+                        Logger.getInstance().receivedHaveFrom(remotePeerId, msg.getIndex());
+                        Tracker.getInstance().setPeerHasPiece(remotePeerId, msg.getIndex());
+                        newMessage = updateInterestedStatus();
+                        if (newMessage != null) {
+                            addMessage(newMessage);
+                        }
+                        if (Tracker.getInstance().isFileComplete(remotePeerId)) {
+                            // End connection
+                            fileTransferComplete = true;
+                        }
+                        break;
+                    case BITFIELD:
+                        Tracker.getInstance().setPeerBitField(remotePeerId, msg.getPayload());
+                        newMessage = updateInterestedStatus();
+                        if (newMessage != null) {
+                            addMessage(newMessage);
+                        }
+                        break;
+                    case INTERESTED:
+                        remoteInterested = true;
+                        Logger.getInstance().receivedInterestedFrom(remotePeerId);
+                        break;
+                    case NOT_INTERESTED:
+                        remoteInterested = false;
+                        Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
+                        break;
+                    case REQUEST:
+                        if (remoteStatus == UNCHOKED) {
+                            byte[] piece = Tracker.getInstance().getPiece(msg.getIndex());
+                            newMessage = new Message(PIECE, msg.pieceIndex, piece);
+                            addMessage(newMessage);
+                        }
+                        break;
+                    case PIECE:
+                        Tracker.getInstance().putPiece(msg.getIndex(), msg.getPayload());
+                        Tracker.getInstance().setBit(msg.getIndex());
+                        Tracker.getInstance().unsetPieceRequested(msg.getIndex(), remotePeerId);
+                        Logger.getInstance().downloadedPieceFrom(remotePeerId, msg.getIndex(),
+                                Tracker.getInstance().getNumberPieces());
+                        if (Tracker.getInstance().isFileComplete()) {
+                            Logger.getInstance().downloadedFile();
+                        } else if (localStatus == UNCHOKED) {
                             pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
                             if (pieceIndex != -1) {
                                 newMessage = new Message(REQUEST, pieceIndex);
                                 addMessage(newMessage);
                             }
-                            break;
-                        case HAVE:
-                            Logger.getInstance().receivedHaveFrom(remotePeerId, msg.getIndex());
-                            Tracker.getInstance().setPeerHasPiece(remotePeerId, msg.getIndex());
-                            newMessage = updateInterestedStatus();
-                            if (newMessage != null) {
-                                addMessage(newMessage);
-                            }
-                            break;
-                        case BITFIELD:
-                            Tracker.getInstance().setPeerBitField(remotePeerId, msg.getPayload());
-                            newMessage = updateInterestedStatus();
-                            if (newMessage != null) {
-                                addMessage(newMessage);
-                            }
-                            break;
-                        case INTERESTED:
-                            remoteInterested = true;
-                            Logger.getInstance().receivedInterestedFrom(remotePeerId);
-                            break;
-                        case NOT_INTERESTED:
-                            remoteInterested = false;
-                            Logger.getInstance().receivedNotInterestedFrom(remotePeerId);
-                            break;
-                        case REQUEST:
-                            if (remoteStatus == UNCHOKED) {
-                                byte[] piece = Tracker.getInstance().getPiece(msg.getIndex());
-                                newMessage = new Message(PIECE, msg.pieceIndex, piece);
-                                addMessage(newMessage);
-                            }
-                            break;
-                        case PIECE:
-                            Tracker.getInstance().putPiece(msg.getIndex(), msg.getPayload());
-                            Tracker.getInstance().setBit(msg.getIndex());
-                            Tracker.getInstance().unsetPieceRequested(msg.getIndex(), remotePeerId);
-                            Logger.getInstance().downloadedPieceFrom(remotePeerId, msg.getIndex(),
-                                    Tracker.getInstance().getNumberPieces());
-                            if (Tracker.getInstance().isFileComplete()) {
-                                Logger.getInstance().downloadedFile();
-                            } else if (localStatus == UNCHOKED) {
-                                pieceIndex = Tracker.getInstance().getNewRandomPieceNumber(remotePeerId, true);
-                                if (pieceIndex != -1) {
-                                    newMessage = new Message(REQUEST, pieceIndex);
-                                    addMessage(newMessage);
-                                }
-                            }
-                            for (ConnectionHandler connection : Tracker.getInstance().getConnectionHandlerList()) {
-                                connection.addMessage(new Message(HAVE, msg.getIndex()));
-                            }
-                            downloadRate++;
-                            break;
-                    }
+                        }
+                        for (ConnectionHandler connection : Tracker.getInstance().getConnectionHandlerList()) {
+                            connection.addMessage(new Message(HAVE, msg.getIndex()));
+                        }
+                        if (Tracker.getInstance().isFileComplete(remotePeerId)) {
+                            // End connection
+                            fileTransferComplete = true;
+                        }
+                        downloadRate++;
+                        break;
                 }
-            });
+            }
 
-            receiverThread.start();
-            Message message;
-            boolean connectionAlive = true;
-            while (connectionAlive) {
-                message = messageQueue.take();
-
-                try {
-                    outputStream.writeObject(message);
-                    outputStream.flush();
-                } catch (SocketException se) {
-                    connectionAlive = false;
-                    System.out.println("Connection ended from peer " + localPeerId + " to " + remotePeerId + ": "
-                            + se.getMessage());
-                } catch (Exception e) {
-                    System.out.println("Encountered an error while sending a message");
-                    e.printStackTrace();
-                }
+            // Close connection
+            try {
+                inputStream.close();
+                outputStream.close();
+                connection.close();
+            } catch (IOException ex) {
+                // Connection already closed, simply return
             }
         } catch (Exception e) {
             System.out.println("Encountered an error while communicating with a peer");

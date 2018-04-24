@@ -1,8 +1,13 @@
 package cnp2p;
 
 import java.io.*;
-import java.net.URL;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+import java.util.StringTokenizer;
 
 class Config {
     private volatile static Config instance;
@@ -18,12 +23,13 @@ class Config {
     private Config() {
         Properties commonProp = new Properties();
         try {
-            String commonConfig = "Common.cfg";
-            ClassLoader classLoader = Main.class.getClassLoader();
-            URL res = Objects.requireNonNull(classLoader.getResource(commonConfig),
-                    "Can't find configuration file Common.cfg");
-            InputStream is = new FileInputStream(res.getFile());
             currentDirectory = System.getProperty("user.dir");
+            String commonConfig = "Common.cfg";
+            Path filePath = Paths.get(currentDirectory, commonConfig);
+            if (!Files.exists(filePath)) {
+                throw new IOException("Can't find configuration file Common.cfg");
+            }
+            InputStream is = new FileInputStream(filePath.toFile());
             commonProp.load(is);
             preferredNeighbors = Integer.parseInt(commonProp.getProperty("NumberOfPreferredNeighbors"));
             unchokingInterval = Integer.parseInt(commonProp.getProperty("UnchokingInterval"));
@@ -31,6 +37,7 @@ class Config {
             fileName = commonProp.getProperty("FileName");
             fileSize = Integer.parseInt(commonProp.getProperty("FileSize"));
             pieceSize = Integer.parseInt(commonProp.getProperty("PieceSize"));
+            is.close();
         } catch (IOException e) {
             System.out.println("Unable to read config file");
             e.printStackTrace();

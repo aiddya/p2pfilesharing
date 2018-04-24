@@ -10,11 +10,14 @@ import static cnp2p.ChokeStatus.*;
 
 public class Main {
     private static List<ConnectionHandler> connectionHandlerList;
+    private static boolean connectionInitiated;
 
     public static void main(String[] args) {
         int peerId, indexPeers;
         final int listeningPortNumber;
         List<Peer> peerListComplete;
+        connectionInitiated = false;
+        ServerSocket serverSocket;
 
         if (args.length == 0) {
             System.out.println("Peer ID is not specified. Exiting!");
@@ -25,15 +28,6 @@ public class Main {
             peerId = Integer.parseInt(args[0]);
         } catch (Exception e) {
             System.out.println("Peer ID is not a number. Exiting!");
-            return;
-        }
-
-        try {
-            Logger.createInstance(peerId, Config.getInstance().getCurrentDirectory());
-            Logger.getInstance().start();
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.out.println("Unable to read configuration. Exiting!");
             return;
         }
 
@@ -61,19 +55,35 @@ public class Main {
             Tracker.getInstance().instantiateFile(peerListComplete.get(indexPeers).getPeerId(), false);
         }
 
+        try {
+            serverSocket = new ServerSocket(listeningPortNumber);
+        } catch (IOException e) {
+            return;
+        }
+
+        try {
+            Logger.createInstance(peerId, Config.getInstance().getCurrentDirectory());
+            Logger.getInstance().setName("Logger");
+            Logger.getInstance().start();
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("Unable to read configuration. Exiting!");
+            return;
+        }
+
         Thread listeningThread = new Thread(() -> {
-            try {
-                ServerSocket serverSocket = new ServerSocket(listeningPortNumber);
-                while (true) {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
                     Socket clientSocket = serverSocket.accept();
                     ConnectionHandler connectionHandler = new ConnectionHandler(clientSocket, peerId);
                     connectionHandlerList.add(connectionHandler);
                     connectionHandler.start();
+                    connectionInitiated = true;
+                } catch (IOException io) {
+                    // Connection closed, probably
                 }
-            } catch (IOException io) {
-                io.printStackTrace();
             }
-        });
+        }, "ListeningThread");
 
         listeningThread.start();
 
@@ -84,14 +94,30 @@ public class Main {
                         peer.getPeerId());
                 connectionHandlerList.add(connectionHandler);
                 connectionHandler.start();
+                connectionInitiated = true;
             } catch (Exception e) {
                 System.out.println(peerId + " Failed to initiate connection with " + peer.getHostName()
                         + " with peer ID " + peer.getPeerId());
             }
         }
 
+        Timer unchokeTimer = new Timer("UnchokeAlgorithm");
         TimerTask unchokeTask = new TimerTask() {
             public void run() {
+                connectionHandlerList.removeIf(ConnectionHandler::isFileTransferComplete);
+                if (connectionInitiated && connectionHandlerList.isEmpty()) {
+                    Logger.getInstance().interrupt();
+                    try {
+                        serverSocket.close();
+                        listeningThread.interrupt();
+                    } catch (IOException e) {
+                        // Already closed, ignore
+                    }
+                    cancel();
+                    unchokeTimer.cancel();
+                    unchokeTimer.purge();
+                    return;
+                }
                 ArrayList<ConnectionHandler> currentList = new ArrayList<>(connectionHandlerList);
                 Collections.shuffle(currentList);
                 currentList.sort(Collections.reverseOrder(Comparator.comparingInt(ConnectionHandler::getDownloadRate)));
@@ -134,11 +160,26 @@ public class Main {
             }
         };
 
-        Timer unchokeTimer = new Timer("UnchokeAlgorithm");
         unchokeTimer.scheduleAtFixedRate(unchokeTask, 0, Config.getInstance().getUnchokingInterval() * 1000);
 
+        Timer optUnchokeTimer = new Timer("OptimisticallyUnchokeAlgorithm");
         TimerTask optUnchokeTask = new TimerTask() {
             public void run() {
+                connectionHandlerList.removeIf(ConnectionHandler::isFileTransferComplete);
+                if (connectionInitiated && connectionHandlerList.isEmpty()) {
+                    try {
+                        serverSocket.close();
+                        listeningThread.interrupt();
+                    } catch (IOException e) {
+                        // Already closed, ignore
+                    }
+                    Logger.getInstance().interrupt();
+                    cancel();
+                    optUnchokeTimer.cancel();
+                    optUnchokeTimer.purge();
+                    return;
+                }
+
                 ArrayList<ConnectionHandler> chokedConnections = new ArrayList<>();
                 for (ConnectionHandler connection : connectionHandlerList) {
                     if (connection.getRemoteStatus() != UNCHOKED && connection.isRemoteInterested()) {
@@ -164,8 +205,15 @@ public class Main {
             }
         };
 
-        Timer optUnchokeTimer = new Timer("OptimisticallyUnchokeAlgorithm");
         optUnchokeTimer.scheduleAtFixedRate(optUnchokeTask, 100,
                 Config.getInstance().getOptimisticUnchokingInterval() * 1000);
+
+        try {
+            Logger.getInstance().join();
+            listeningThread.join();
+            Tracker.getInstance().closeFile();
+        } catch (InterruptedException ie) {
+            System.exit(1);
+        }
     }
 }
